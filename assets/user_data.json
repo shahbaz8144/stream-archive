@@ -1,0 +1,17 @@
+
+{
+  "firstName": "",
+  "lastName": "",
+  "email": "",
+  "designationName": "",
+  "userId": 0,
+  "organizationid": 0,
+  "empId" : 0,
+  "fromUsers " : "",
+  "companies" : "",
+  "companyId" : "",
+  "isCommunicationDownload" : "",
+  "userProfile": "",
+  "password" : "",
+  "employeeCode" : ""
+}
