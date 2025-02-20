@@ -108,15 +108,16 @@ class _UserLogInState extends State<UserLogIn> {
                         text: TextSpan(
                           text: "Hey,\nWelcome Back To \n", // Non-blue text
                           style: TextStyle(
-                            fontSize: 28.0,
+                            fontSize: 26.0,
                             fontWeight: FontWeight.w700,
-                            color: Colors.black, // Default color
+                            color: Colors.black.withOpacity(0.6), // Default color
                           ),
                           children: [
                             TextSpan(
                               text: "Stream Archive", // Blue text
                               style: TextStyle(
-                                color: Colors.deepOrange, // Set color to blue
+                                color: Colors.deepOrange,
+                                fontSize: 30.0,// Set color to blue
                               ),
                             ),
                           ],
@@ -136,12 +137,12 @@ class _UserLogInState extends State<UserLogIn> {
                     //     ),
                     //   ),
                     // )
-                    // Image.asset(
-                    //   'assets/blue-dbl.png',
-                    //   width: MediaQuery.of(context).size.width * 0.33, // 30% of the screen width
-                    //   height: MediaQuery.of(context).size.height * 0.2, // 20% of the screen height
-                    //   fit: BoxFit.fill,
-                    // ),
+                    Image.asset(
+                      'assets/logo_images/archive_dbl_above_logo.png',
+                      width: MediaQuery.of(context).size.width * 0.33, // 30% of the screen width
+                      height: MediaQuery.of(context).size.height * 0.2, // 20% of the screen height
+                      fit: BoxFit.fill,
+                    ),
                   ],
                 ),
                 Padding(
@@ -340,15 +341,15 @@ class _UserLogInState extends State<UserLogIn> {
                   height: MediaQuery.of(context).size.height * 0.03, // 5% of screen height
                 ),
 
-                // Align(
-                //   alignment: Alignment.centerLeft,
-                //   child:  Image.asset(
-                //     "assets/BelowSideLogo.png",
-                //     // width: MediaQuery.of(context).size.width * 0.3, // 30% of the screen width
-                //     height: MediaQuery.of(context).size.height * 0.12,
-                //     fit: BoxFit.fill,
-                //   ),
-                // )
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child:  Image.asset(
+                    "assets/logo_images/archive_below_logo.png",
+                    // width: MediaQuery.of(context).size.width * 0.3, // 30% of the screen width
+                    height: MediaQuery.of(context).size.height * 0.12,
+                    fit: BoxFit.fill,
+                  ),
+                )
               ],
             ),
           ),
