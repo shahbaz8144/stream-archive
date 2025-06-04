@@ -11,6 +11,8 @@ class ArchivePinDocument {
   final bool isFavorite;
   final int shareId;
   final bool isPin;
+  final String? versionName;
+  final String? createdDateString;
 
 
 
@@ -27,6 +29,8 @@ class ArchivePinDocument {
     required this.isFavorite,
     required this.shareId,
     required this.isPin,
+    required this.versionName,
+    required this.createdDateString,
 
   });
 
@@ -44,6 +48,8 @@ class ArchivePinDocument {
         isFavorite: json['IsFavorite'] ?? false,
         shareId: json['ShareId'] ?? 0,
         isPin: json['IsPin'] ?? false,
+        versionName: json['VersionName'] ?? "",
+        createdDateString: json['CreatedDateString'] ?? "",
     );
   }
 

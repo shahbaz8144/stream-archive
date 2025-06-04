@@ -11,6 +11,8 @@ class ArchiveDocument {
   final bool isFavorite;
   final int shareId;
   final bool isPin;
+  final String? versionName;
+  final String? createdDateString;
 
 
   ArchiveDocument({
@@ -26,6 +28,8 @@ class ArchiveDocument {
     required this.isFavorite,
     required this.shareId,
     required this.isPin,
+    required this.versionName,
+    required this.createdDateString,
 
   });
 
@@ -43,6 +47,8 @@ class ArchiveDocument {
       isFavorite: json['IsFavorite'] ?? false,
       shareId: json['ShareId'] ?? 0,
       isPin: json['IsPin'] ?? false,
+      versionName: json['VersionName'] ?? "",
+      createdDateString: json['CreatedDateString'] ?? "",
     );
   }
 

@@ -220,7 +220,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     child: CircleAvatar(
                                       radius: 45,
                                       backgroundImage: NetworkImage(
-                                        "https://yrglobaldocuments.blob.core.windows.net/documents/" + userDetail.userProfile,
+                                        "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" + userDetail.userProfile,
                                       ),
                                     ),
                                   )

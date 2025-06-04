@@ -8,6 +8,9 @@ class TrashItem {
   final bool isDeleted;
   final String url;
   final String createdDate;
+  final String versionName;
+  final String createdDateString;
+  final bool isRead;
 
   TrashItem({
     required this.documentId,
@@ -19,6 +22,9 @@ class TrashItem {
     required this.isDeleted,
     required this.url,
     required this.createdDate,
+    required this.versionName,
+    required this.createdDateString,
+    required this.isRead,
   });
 
   factory TrashItem.fromJson(Map<String, dynamic> json) {
@@ -32,6 +38,9 @@ class TrashItem {
       isDeleted: json['IsDeleted'] ?? false,
       url: json['Url'] ?? '',
       createdDate: json['CreatedDate'] ?? "",
+      versionName: json['VersionName'] ?? '',
+      createdDateString: json['CreatedDateString'] ?? '',
+      isRead: json['IsRead'] ?? true,
     );
   }
 }

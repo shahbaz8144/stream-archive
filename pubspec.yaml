@@ -112,6 +112,8 @@ dependencies:
   azure_blob_flutter: ^0.0.9
   azblob: ^4.0.0
   xml: ^6.5.0
+  hijri: ^3.0.0
+  open_file: ^3.3.2
 
 
 
@@ -136,4 +138,48 @@ flutter:
    - assets/svg_icons/archive_trash_icon.svg
    - assets/svg_icons/share_by_me_archive_icon.svg
    - assets/defaultThumbnail.png
+   - assets/svg_icons/inbox_icon.svg
+   - assets/svg_icons/announcement_icon.svg
+   - assets/svg_icons/attachment_icon.svg
+   - assets/svg_icons/delete_icon.svg
+   - assets/svg_icons/draft_icon.svg
+   - assets/svg_icons/favorite_icon.svg
+   - assets/svg_icons/pending_from_others_icon.svg
+   - assets/svg_icons/pin_icon.svg
+   - assets/svg_icons/send_icon.svg
+   - assets/svg_icons/share_icon.svg
+   - assets/svg_icons/unread_icon.svg
+   - assets/svg_icons/trash_icon.svg
+   - assets/svg_icons/label_icon.svg
+   - assets/svg_icons/pin_filled_icon.svg
+   - assets/svg_icons/filled_bookmark_icon.svg
+   - assets/svg_icons/search_icon.svg
+   - assets/svg_icons/edit_icon.svg
+   - assets/svg_icons/workflow_icon.svg
+   - assets/svg_icons/cloud_upload_icon.svg
+   - assets/svg_icons/XSL.svg
+   - assets/svg_icons/PDF.svg
+   - assets/svg_icons/DOCX.svg
+   - assets/svg_icons/DOCc.svg
+   - assets/svg_icons/DOC.svg
+   - assets/svg_icons/AI.svg
+   - assets/svg_icons/AVI.svg
+   - assets/svg_icons/JPG.svg
+   - assets/svg_icons/MP3.svg
+   - assets/svg_icons/MP4.svg
+   - assets/svg_icons/PPT.svg
+   - assets/svg_icons/PS.svg
+   - assets/svg_icons/PSD.svg
+   - assets/svg_icons/SVG.svg
+   - assets/svg_icons/ZIP.svg
+   - assets/svg_icons/reply_icon.svg
+   - assets/svg_icons/replyall_icon.svg
+   - assets/svg_icons/forward_icon.svg
+   - assets/svg_icons/cancel_icon.svg
+   - assets/svg_icons/approve_icon.svg
+   - assets/svg_icons/PNG.svg
+   - assets/svg_icons/workflow_list_icon.svg
+   - assets/svg_icons/stream_box_icon.svg
+   - assets/svg_icons/cabinate_icon.svg
+   - assets/bar-code.PNG
 

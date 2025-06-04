@@ -5,13 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:stream_archive/screens/all_doc_list.dart';
 import '../data/user_data.dart';
 import '../data/user_data_manager.dart';
-import 'all_doc_list.dart';
-// import '../services/dependency_injection.dart';
+import '../services/dependency_injection.dart';
+import '../url/api_url.dart';
 
 
 class UserLogIn extends StatefulWidget {
@@ -31,42 +31,101 @@ class _UserLogInState extends State<UserLogIn> {
   @override
   void initState() {
     super.initState();
-    // DependencyInjection.init();
-    checkUserSession();
-    _loadUserData(); // Check user session on init
+    DependencyInjection.init();
+
+    // Run async functions
+    _initializeApp();
   }
 
-  Future<void> _loadUserData() async {
-    userData = await UserDataManager.loadUserData();
-    //setState(() {});
+  Future<void> _initializeApp() async {
+    await _loadUserData();
+    await checkUserSession(context);
   }
+  // Future<void> _loadUserData() async {
+  //   userData = await UserDataManager.loadUserData();
+  //   //setState(() {});
+  // }
 
-  Future<void> checkUserSession() async {
+  // Future<void> checkUserSession() async {
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   bool loggedIn = prefs.getBool('loggedIn') ?? false;
+  //   if (loggedIn) {
+  //     // If logged in, retrieve user data from shared preferences
+  //     final userDataProvider =
+  //         Provider.of<UserDataProvider>(context, listen: false);
+  //     userDataProvider.setUserData(
+  //       prefs.getString('firstName') ?? '',
+  //       prefs.getString('lastName') ?? '',
+  //       prefs.getString('email') ?? '',
+  //       prefs.getString('designationName') ?? '',
+  //       prefs.getInt('userId') ?? 0,
+  //       prefs.getInt('organizationid') ?? 0,
+  //       prefs.getBool('isCommunicationDownload') ?? false,
+  //       prefs.getString('userProfile') ?? '',
+  //       prefs.getString('password') ?? '',
+  //       prefs.getString('employeeCode') ?? '',
+  //     );
+  //
+  //     // Navigate to the MobileDashboard
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => MobileDashboard()),
+  //     );
+  //   }
+  // }
+  Future<void> checkUserSession(BuildContext context) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     bool loggedIn = prefs.getBool('loggedIn') ?? false;
+
     if (loggedIn) {
-      // If logged in, retrieve user data from shared preferences
-      final userDataProvider =
-      Provider.of<UserDataProvider>(context, listen: false);
-      userDataProvider.setUserData(
-        prefs.getString('firstName') ?? '',
-        prefs.getString('lastName') ?? '',
-        prefs.getString('email') ?? '',
-        prefs.getString('designationName') ?? '',
-        prefs.getInt('userId') ?? 0,
-        prefs.getInt('organizationid') ?? 0,
-        prefs.getBool('isCommunicationDownload') ?? false,
-        prefs.getString('userProfile') ?? '',
-        prefs.getString('password') ?? '',
-        prefs.getString('employeeCode') ?? '',
-      );
+      // Retrieve user data directly from SharedPreferences
+      String firstName = prefs.getString('firstName') ?? '';
+      String lastName = prefs.getString('lastName') ?? '';
+      String email = prefs.getString('email') ?? '';
+      String designationName = prefs.getString('designationName') ?? '';
+      int userId = prefs.getInt('userId') ?? 0;
+      int organizationId = prefs.getInt('organizationid') ?? 0;
+      bool isCommunicationDownload = prefs.getBool('isCommunicationDownload') ?? false;
+      String userProfile = prefs.getString('userProfile') ?? '';
+      String password = prefs.getString('password') ?? '';
+      String employeeCode = prefs.getString('employeeCode') ?? '';
+
+      // Print to debug (Optional)
+      print('User logged in: $firstName $lastName');
 
       // Navigate to the MobileDashboard
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => AllDocList()),
-      );
+      if (!context.mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => AllDocList()),
+        );
+      });
     }
+  }
+  Future<void> _loadUserData() async {
+    Map<String, dynamic> data = await getUserSession();
+    setState(() {
+      userData = data;
+    });
+  }
+
+  Future<Map<String, dynamic>> getUserSession() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return {
+      'loggedIn': prefs.getBool('loggedIn') ?? false,
+      'firstName': prefs.getString('firstName') ?? '',
+      'lastName': prefs.getString('lastName') ?? '',
+      'email': prefs.getString('email') ?? '',
+      'designationName': prefs.getString('designationName') ?? '',
+      'userId': prefs.getInt('userId') ?? 0,
+      'organizationid': prefs.getInt('organizationid') ?? 0,
+      'isCommunicationDownload': prefs.getBool('isCommunicationDownload') ?? false,
+      'userProfile': prefs.getString('userProfile') ?? '',
+      'password': prefs.getString('password') ?? '',
+      'employeeCode': prefs.getString('employeeCode') ?? '',
+    };
   }
 
   Future<void> _saveUserSession(Map<String, dynamic> userData) async {
@@ -83,7 +142,9 @@ class _UserLogInState extends State<UserLogIn> {
     await prefs.setString('userProfile', userData['userProfile']);
     await prefs.setString('password', userData['password']);
     await prefs.setString('employeeCode', userData['employeeCode']);
+    print("User session saved!");
   }
+
 
   static const IconData check_circle_outline_rounded =
   IconData(0xf634, fontFamily: 'MaterialIcons');
@@ -366,7 +427,7 @@ class _UserLogInState extends State<UserLogIn> {
       "oldPassword": oldPassword,
     };
 
-    const url = 'https://cswebapps.com/dmscoretestapi/api/Login/StreamLoginAPI';
+    const url = '${ApiUrls.baseUrl}Login/StreamLoginAPI';
     final uri = Uri.parse(url);
     final response = await http.post(
       uri,
@@ -410,9 +471,9 @@ class _UserLogInState extends State<UserLogIn> {
         };
 
         // Save user data to JSON file
-        await UserDataManager.saveUserData(userData).then((value) =>
+        // await UserDataManager.saveUserData(userData).then((value) =>
         //print('Testing first name : $firstName '),
-        showCustomSnackBar(context, firstName + " " + lastName));
+        showCustomSnackBar(context, firstName + " " + lastName);
         await _saveUserSession(userData);
 
         userIdController.clear();
@@ -463,7 +524,7 @@ class _UserLogInState extends State<UserLogIn> {
           ),
         ],
       ),
-      backgroundColor: Colors.deepOrange,
+      backgroundColor: Colors.blue,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(snackBar);

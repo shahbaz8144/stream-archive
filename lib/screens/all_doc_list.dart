@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:get/get.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image/image.dart' as img;
@@ -20,6 +21,7 @@ import 'package:mime/mime.dart';
 import 'package:pdf/pdf.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stream_archive/models/archive_favorite_model.dart';
 import 'package:stream_archive/screens/doc_details.dart';
 import 'package:stream_archive/screens/profile_personal_info_page.dart';
@@ -41,6 +43,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:ui' as ui;
 import 'package:archive/archive.dart';
+import 'package:flutter/material.dart' as material;
 
 
 
@@ -50,6 +53,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart' as pdfx;
 import 'package:pdf/pdf.dart' as pdf;
 
+import '../models/all_labels_model.dart';
 import '../models/archive_inbox_model.dart';
 import '../models/archive_pin_model.dart';
 import '../models/archive_share_by_me_model.dart';
@@ -60,7 +64,10 @@ import 'dart:ui' as ui;
 import 'package:pdf_render/pdf_render.dart' as pdfRender;
 import 'package:syncfusion_flutter_pdf/pdf.dart' as syncfusion_pdf;
 
-import 'package:http_parser/http_parser.dart'; // Required for Content-Type
+import 'package:http_parser/http_parser.dart';
+
+import '../models/cabinate_list_model.dart';
+import '../url/api_url.dart'; // Required for Content-Type
 
 class AllDocList extends StatefulWidget {
   const AllDocList({super.key});
@@ -75,6 +82,8 @@ class _AllDocListState extends State<AllDocList> {
   bool _isLoading = true; // To handle loading state
   List<dynamic> documents = [];
   List<dynamic> pinDocuments = [];
+  List<Cabinet> cabinets = [];
+  List<Label> labels = [];
   bool isLoading = false;
   bool showList = false;
   RefreshController _refreshControllerForMainArchiveList =
@@ -109,12 +118,17 @@ class _AllDocListState extends State<AllDocList> {
   String _blobUrl = '';
   int _expiryTime = 0;
   Uint8List? bodyBytes;
+  int  cabinetId = 0;
+  int totalDocCount = 0;
+  TextEditingController searchController = TextEditingController();
 
   ///////////////For OCR /////////////
   File? _selectedFile;
   String _fileType = '';
   String _extractedText = '';
   final TextRecognizer _textRecognizer = TextRecognizer();
+  bool _showSearchBar = false;
+  String _searchQuery = "";
 
   Future<void> _pickAndProcessFile(StateSetter setModalState) async {
     debugPrint('Starting file picker...');
@@ -358,11 +372,40 @@ class _AllDocListState extends State<AllDocList> {
 /////////////////process text form doc
 
   Future<void> _processDocFile(File file, StateSetter setModalState) async {
-    setModalState(() {
-      _extractedText = 'Processing .doc file... Please convert it to .docx first.';
-    });
+    try {
+      // Read the .doc file as raw bytes
+      final bytes = await file.readAsBytes();
 
-    debugPrint('Processing .doc file: ${file.path}');
+      // Attempt to extract text by converting bytes to a string
+      // Note: .doc is binary, so this is a crude heuristic and may not work well
+      String rawContent = '';
+      try {
+        // Try UTF-8 decoding (may fail or produce garbage for binary data)
+        rawContent = utf8.decode(bytes, allowMalformed: true);
+      } catch (e) {
+        // If UTF-8 fails, fall back to Latin-1 (ISO-8859-1) to capture some text
+        rawContent = latin1.decode(bytes, allowInvalid: true);
+      }
+
+      // Filter out non-printable characters (heuristic to clean up binary noise)
+      final extractedText = rawContent
+          .split('')
+          .where((char) => char.codeUnitAt(0) >= 32 && char.codeUnitAt(0) <= 126)
+          .join()
+          .trim();
+
+      // Update the modal state with the result
+      setModalState(() {
+        _extractedText = extractedText.isEmpty ? 'No readable text found in .doc file.' : extractedText;
+      });
+
+      debugPrint('Extracted text from .doc: $_extractedText');
+    } catch (e) {
+      setModalState(() {
+        _extractedText = 'Error reading .doc file: $e';
+      });
+      debugPrint('Error reading .doc file: $e');
+    }
   }
 
 
@@ -380,29 +423,35 @@ class _AllDocListState extends State<AllDocList> {
 
       Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showList = !showList;
-                    });
-                  },
-                  child: Icon(showList ? Icons.grid_on : Icons.list),
-                ),
-              ),
-            ],
-          ),
-          showList
-              ? Expanded(
-              child: SmartRefresher(
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.end,
+          //   children: [
+          //     Padding(
+          //       padding: const EdgeInsets.only(right: 8.0),
+          //       child: GestureDetector(
+          //         onTap: () {
+          //           setState(() {
+          //             showList = !showList;
+          //           });
+          //         },
+          //         child: Icon(showList ? Icons.grid_on : Icons.list),
+          //       ),
+          //     ),
+          //   ],
+          // ),
+          // showList
+          //     ?
+          Expanded(
+              child: SlidableAutoCloseBehavior(
+                  child: SmartRefresher(
                   controller: _refreshControllerForMainArchiveList,
                   onRefresh: () async {
+
+                    setState(() {
+                      cabinetId = 0;
+                    });
                     // Reset the page and fetch again
-                    await fetchDocuments(isRefresh: true);
+                    await fetchDocuments(isRefresh: true, cabinetId: cabinetId);
                     _refreshControllerForMainArchiveList.refreshCompleted();
                   },
                   enablePullUp: true,
@@ -410,7 +459,7 @@ class _AllDocListState extends State<AllDocList> {
                   onLoading: () async {
                     print('working');
                     // Load more documents
-                    await fetchDocuments(isRefresh: false);
+                    await fetchDocuments(isRefresh: false, cabinetId: cabinetId);
                   },
                   child: ListView.builder(
                     itemCount: pinDocuments.length +
@@ -423,491 +472,589 @@ class _AllDocListState extends State<AllDocList> {
                           ? pinDocuments[index]
                           : documents[index - pinDocuments.length];
 
-                      return Card(
-                        child: ListTile(
-                          contentPadding:
-                          const EdgeInsets.only(left: 8.0, right: 0.0),
-                          leading: Container(
-                            width:
-                            50,
-                            // Explicitly set the width of the leading widget
-                            height:
-                            50,
-                            // Explicitly set the height of the leading widget
-                            child: ClipRRect(
-                              borderRadius: BorderRadius
-                                  .zero,
-                              // Removes the circle and gives a square look
-                              child: Image.network(
-                                doc.url,
-                                fit: BoxFit
-                                    .cover, // Ensures the image fits properly
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            getShortenedText(doc.documentName),
-                            style: TextStyle(
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w600,
-                              color:
-                              doc.isRead ? Colors.black : Colors.blue,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment
-                                .start, // Aligns the text to the left
+                      return Slidable(
+                          key: ValueKey(index),
+                          startActionPane: ActionPane(
+                            motion: const DrawerMotion(),
+                            extentRatio: 0.15,
                             children: [
-                              Text(
-                                doc.userName,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: doc.isRead
-                                      ? Colors.black
-                                      : Colors.blue,
-                                ),
-                              ),
-                              Text(
-                                getShortenedText(doc.description),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: doc.isRead
-                                      ? Colors.grey
-                                      : Colors.blue,
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize
-                                .min,
-                            // Ensures the Row only takes up necessary space
-                            children: [
-                              if (doc.isPin)
-                                Icon(
-                                  Icons.push_pin_sharp,
-                                  size: 15,
-                                  color: Colors.blue,
-                                ),
-                              if (doc.isFavorite)
-                                Icon(
-                                  LineAwesomeIcons.star,
-                                  size: 15,
-                                  color: Colors.yellow.shade800,
-                                ),
-                              IconButton(
-                                icon: Icon(
-                                  Symbols.keyboard_arrow_down,
-                                  size: 20.0,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  // Handle more options
-                                  showModalBottomSheet(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return Container(
-                                        height:
-                                        450,
-                                        // Set the height of the bottom sheet
-                                        width: double.infinity,
-                                        color: Colors
-                                            .white,
-                                        // Background color of the bottom sheet
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                              top: 20.0),
-                                          child: Column(
-                                            children: [
-                                              Container(
-                                                height: 5,
-                                                width: 60,
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                  Colors.grey.shade300,
-                                                  borderRadius:
-                                                  BorderRadius.circular(
-                                                      8),
-                                                ),
-                                              ),
-                                              SizedBox(height: 20.0),
-                                              Container(
-                                                width:
-                                                100,
-                                                // Explicitly set the width of the leading widget
-                                                height:
-                                                100,
-                                                // Explicitly set the height of the leading widget
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                  BorderRadius.circular(
-                                                      5.0),
-                                                  child: Image.network(
-                                                    doc.url,
-                                                    fit: BoxFit.cover,
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(height: 20.0),
-                                              Text(
-                                                  getShortenedText(
-                                                      doc.documentName),
-                                                  style: TextStyle(
-                                                      fontSize: 16.0,
-                                                      fontWeight:
-                                                      FontWeight.w600)),
-                                              Text(
-                                                  DateFormat(
-                                                      'MMMM dd, yyyy, hh:mm:ss a')
-                                                      .format(DateTime.parse(doc
-                                                      .createdDateWithTime)),
-                                                  style: TextStyle(
-                                                      fontSize: 12.0)),
-                                              SizedBox(height: 10.0),
-                                              Container(
-                                                height: 0.15,
-                                                color: Colors.grey,
-                                              ),
-                                              Expanded(
-                                                child: ListView(
-                                                  children: [
-                                                    ListTile(
-                                                      leading: Icon(
-                                                          Symbols.keep_pin),
-                                                      title: Text('Pin'),
-                                                      onTap: () {
-                                                        // Handle tap action
-                                                      },
-                                                    ),
-                                                    ListTile(
-                                                      leading:
-                                                      Icon(Icons.star),
-                                                      title:
-                                                      Text('Favorite'),
-                                                      onTap: () async {
-                                                        await archiveFavorite(
-                                                            doc.documentId,
-                                                            doc.shareId,
-                                                            doc.isFavorite);
-                                                        setState(() {
-                                                          fetchDocuments(
-                                                              isRefresh:
-                                                              true);
-                                                        });
-                                                        Navigator.pop(
-                                                            context);
-                                                      },
-                                                    ),
-                                                    ListTile(
-                                                      leading:
-                                                      Icon(Icons.mail),
-                                                      title: Text('Unread'),
-                                                      onTap: () {
-                                                        // Handle tap action
-                                                      },
-                                                    ),
-                                                    ListTile(
-                                                      leading: Icon(
-                                                          Icons.delete),
-                                                      title: Text('Delete'),
-                                                      onTap: () async {
-                                                        await archiveTrash(
-                                                            doc.shareId,
-                                                            doc.documentId);
-                                                        setState(() {
-                                                          fetchDocuments(
-                                                              isRefresh:
-                                                              true);
-                                                        });
-                                                        Navigator.pop(
-                                                            context);
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              )
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                          onTap: () {
-                            print('Tapped on list');
-                          },
-                        ),
-                      );
-                    },
-                  )))
-              : Expanded(
-              child: SmartRefresher(
-                  controller: _refreshControllerForMainArchiveList,
-                  onRefresh: () async {
-                    // Reset the page and fetch again
-                    await fetchDocuments(isRefresh: true);
-                    _refreshControllerForMainArchiveList.refreshCompleted();
-                  },
-                  enablePullUp: true,
-                  enablePullDown: true,
-                  onLoading: () async {
-                    print('working');
-                    // Load more documents
-                    await fetchDocuments(isRefresh: false);
-                  },
-                  child: GridView.builder(
-                    itemCount: pinDocuments.length +
-                        documents
-                            .length, // Combine the length of both lists
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, // Number of columns
-                      crossAxisSpacing: 8.0, // Space between columns
-                      mainAxisSpacing: 8.0, // Space between rows
-                      childAspectRatio:
-                      0.75, // Aspect ratio for each grid item (width/height)
-                    ),
-                    itemBuilder: (context, index) {
-                      // Determine which list the current index belongs to
-                      final isPinDocument = index < pinDocuments.length;
-                      final doc = isPinDocument
-                          ? pinDocuments[index]
-                          : documents[index - pinDocuments.length];
+                              CustomSlidableAction(
+                                backgroundColor:
+                                Colors.black.withOpacity(0.10),
+                                onPressed: (BuildContext
+                                context) async {
+                                  // Update the memo pin status
 
-                      return Card(
-                        elevation:
-                        4.0,
-                        // Optional: Add some elevation to make it stand out
-                        margin: EdgeInsets.all(8.0),
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => DocDetails()),
-                            );
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  if (doc.isPin)
-                                    Icon(Icons.push_pin_sharp,
-                                        size: 15, color: Colors.blue),
-                                  if (doc.isFavorite)
-                                    Icon(LineAwesomeIcons.star,
-                                        size: 15,
-                                        color: Colors.yellow.shade800),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.more_vert_outlined,
-                                      size: 20.0,
-                                      color: Colors.grey,
-                                    ),
-                                    onPressed: () {
-                                      // Handle more options
-                                      showModalBottomSheet(
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return Container(
-                                            height:
-                                            450,
-                                            // Set the height of the bottom sheet
-                                            width: double.infinity,
-                                            color: Colors
-                                                .white,
-                                            // Background color of the bottom sheet
-                                            child: Padding(
-                                              padding:
-                                              const EdgeInsets.only(
-                                                  top: 20.0),
-                                              child: Column(
-                                                children: [
-                                                  Container(
-                                                    height: 5,
-                                                    width: 60,
-                                                    decoration:
-                                                    BoxDecoration(
-                                                      color: Colors
-                                                          .grey.shade300,
-                                                      borderRadius:
-                                                      BorderRadius
-                                                          .circular(8),
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 20.0),
-                                                  Container(
-                                                    width:
-                                                    100,
-                                                    // Explicitly set the width of the leading widget
-                                                    height:
-                                                    100,
-                                                    // Explicitly set the height of the leading widget
-                                                    child: ClipRRect(
-                                                      borderRadius:
-                                                      BorderRadius
-                                                          .circular(
-                                                          5.0),
-                                                      child: Image.network(
-                                                        doc.url,
-                                                        fit: BoxFit.cover,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 20.0),
-                                                  Text(
-                                                      getShortenedText(
-                                                          doc.documentName),
-                                                      style: TextStyle(
-                                                          fontSize: 16.0,
-                                                          fontWeight:
-                                                          FontWeight
-                                                              .w600)),
-                                                  Text(
-                                                      DateFormat(
-                                                          'MMMM dd, yyyy, hh:mm:ss a')
-                                                          .format(DateTime
-                                                          .parse(doc
-                                                          .createdDateWithTime)),
-                                                      style: TextStyle(
-                                                          fontSize: 12.0)),
-                                                  SizedBox(height: 10.0),
-                                                  Container(
-                                                    height: 0.15,
-                                                    color: Colors.grey,
-                                                  ),
-                                                  Expanded(
-                                                    child: ListView(
-                                                      children: [
-                                                        ListTile(
-                                                          leading: Icon(
-                                                              Symbols
-                                                                  .keep_pin),
-                                                          title:
-                                                          Text('Pin'),
-                                                          onTap: () {
-                                                            // Handle tap action
-                                                          },
-                                                        ),
-                                                        ListTile(
-                                                          leading: Icon(
-                                                              Icons.star),
-                                                          title: Text(
-                                                              'Favorite'),
-                                                          onTap: () async {
-                                                            await archiveFavorite(
-                                                                doc.documentId,
-                                                                doc.shareId,
-                                                                doc.isFavorite);
-                                                            setState(() {
-                                                              fetchDocuments(
-                                                                  isRefresh:
-                                                                  true);
-                                                            });
-                                                            Navigator.pop(
-                                                                context);
-                                                          },
-                                                        ),
-                                                        ListTile(
-                                                          leading: Icon(
-                                                              Icons.mail),
-                                                          title: Text(
-                                                              'Unread'),
-                                                          onTap: () {
-                                                            // Handle tap action
-                                                          },
-                                                        ),
-                                                        ListTile(
-                                                          leading: Icon(
-                                                              Icons.delete),
-                                                          title: Text(
-                                                              'Delete'),
-                                                          onTap: () async {
-                                                            await archiveTrash(
-                                                                doc.shareId,
-                                                                doc.documentId);
-                                                            setState(() {
-                                                              fetchDocuments(
-                                                                  isRefresh:
-                                                                  true);
-                                                            });
-                                                            Navigator.pop(
-                                                                context);
-                                                          },
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  )
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ],
+                                  // Refresh the data after pinning
+                                  print("working slide");
+                                },
+                                child:Icon(
+                                  doc.isPin == true
+                                      ? Icons.push_pin
+                                      : Icons
+                                      .push_pin, // Conditional icon
+                                  color: doc.isPin == true ?  Colors.blue : Colors.black,
+                                  // Icon color
+                                  size: 20,
+                                )
                               ),
-                              Container(
-                                height:
-                                120, // Set a fixed height for the image
-                                width: double.infinity,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius
-                                      .zero,
-                                  // Removes the circle and gives a square look
-                                  child: Image.network(
-                                    doc.url,
-                                    fit: BoxFit.cover,
-                                  ),
+                            ],
+                          ),
+                          endActionPane: ActionPane(
+                            extentRatio: 0.25,
+                            motion: const BehindMotion(),
+                            children: [
+                              CustomSlidableAction(
+                                backgroundColor:
+                                Colors.black.withOpacity(0.10),
+                                foregroundColor: doc.isFavorite
+                                    ? Colors.yellow
+                                    : Colors.white,
+                                onPressed: (BuildContext
+                                context) async {
+                                  print(doc.isFavorite);
+                                  print("working slide");
+                                  // setState(() {
+                                  //   print("test1");
+                                  //   doc.isFavorite = !doc
+                                  //       .isFavorite; // Update the favorite status of the mail
+                                  //   print("test2");
+                                  // });
+                                  print("docId" + doc.documentId.toString());
+                                  print("shareId" + doc.shareId.toString());
+                                  print("Favorite " + doc.isFavorite.toString());
+                                  print("CabinetId " + cabinetId.toString());
+                                 await archiveFavorite(doc.documentId , doc.shareId , doc.isFavorite);
+
+                                 await fetchDocuments(cabinetId: cabinetId);
+                                  print("After Favorite " + doc.isFavorite.toString());
+                                },
+                                child: Icon(
+                                  doc.isFavorite
+                                      ? Icons.star
+                                      : Icons
+                                      .star_border_outlined,
+                                  color: doc.isFavorite
+                                      ? Colors
+                                      .yellow.shade600
+                                      : Colors.black,
+                                  size: 20.0,
                                 ),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
+                              CustomSlidableAction(
+                                backgroundColor:
+                                Colors.black.withOpacity(0.10),
+                                onPressed: (BuildContext
+                                context) async {
+                                  // Delete the memo
+
+                                },
+                                child: Icon(
+                                    LineAwesomeIcons
+                                        .trash_solid,
+                                    size: 20.0,
+                                    color: Colors
+                                        .black
+                                ),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              ListTile(
+                                contentPadding: const EdgeInsets.only(
+                                    left: 8.0, right: 8.0),
+                                minLeadingWidth: 10,
+                                horizontalTitleGap: 2,
+                                // leading: Container(
+                                //   width:
+                                //   50,
+                                //   // Explicitly set the width of the leading widget
+                                //   height:
+                                //   50,
+                                //   // Explicitly set the height of the leading widget
+                                //   child: ClipRRect(
+                                //     borderRadius: BorderRadius
+                                //         .zero,
+                                //     // Removes the circle and gives a square look
+                                //     child:  _getFileIconForActivity(doc.documentName),
+                                //   ),
+                                // ),
+                                title: Text(
                                   getShortenedText(doc.documentName),
                                   style: TextStyle(
                                     fontSize: 12.0,
                                     fontWeight: FontWeight.w600,
-                                    color: doc.isRead
-                                        ? Colors.black
-                                        : Colors.blue,
+                                    color:
+                                    doc.isRead ? Colors.black : Colors.blue,
                                   ),
                                 ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment
+                                      .start, // Aligns the text to the left
+                                  children: [
+                                    Text(
+                                      doc.userName,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: doc.isRead
+                                            ? Colors.black
+                                            : Colors.blue,
+                                      ),
+                                    ),
+                                    Text(
+                                      getShortenedText(doc.description),
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: doc.isRead
+                                            ? Colors.grey
+                                            : Colors.blue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailing: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // Show version only if versionName is not null or empty
+                                    if (doc.versionName.isNotEmpty)
+                                      Container(
+                                        color: Colors.grey[200],
+                                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        child: Text(
+                                          "Version ${doc.versionName}",
+                                          style: TextStyle(
+                                            fontSize: 8,
+                                            color: doc.isRead ? Colors.black : Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+
+                                    SizedBox(height: 5),
+
+                                    if (doc.createdDateString != null && doc.createdDateString.isNotEmpty)
+                                      Text(
+                                        doc.createdDateString.toString(),
+                                        style: TextStyle(
+                                          fontSize: 8,
+                                          color: doc.isRead ? Colors.black : Colors.blue,
+                                        ),
+                                      ),
+
+                                  ],
+                                ),
+
+
+
+                                // Row(
+                                //   mainAxisSize: MainAxisSize
+                                //       .min,
+                                //   // Ensures the Row only takes up necessary space
+                                //   children: [
+                                //     if (doc.isPin)
+                                //       Icon(
+                                //         Icons.push_pin_sharp,
+                                //         size: 15,
+                                //         color: Colors.blue,
+                                //       ),
+                                //     if (doc.isFavorite)
+                                //       Icon(
+                                //         LineAwesomeIcons.star,
+                                //         size: 15,
+                                //         color: Colors.yellow.shade800,
+                                //       ),
+                                //     IconButton(
+                                //       icon: Icon(
+                                //         Symbols.keyboard_arrow_down,
+                                //         size: 20.0,
+                                //         color: Colors.grey,
+                                //       ),
+                                //       onPressed: () {
+                                //         // Handle more options
+                                //         showModalBottomSheet(
+                                //           context: context,
+                                //           builder: (BuildContext context) {
+                                //             return Container(
+                                //               height:
+                                //               450,
+                                //               // Set the height of the bottom sheet
+                                //               width: double.infinity,
+                                //               color: Colors
+                                //                   .white,
+                                //               // Background color of the bottom sheet
+                                //               child: Padding(
+                                //                 padding: const EdgeInsets.only(
+                                //                     top: 20.0),
+                                //                 child: Column(
+                                //                   children: [
+                                //                     Container(
+                                //                       height: 5,
+                                //                       width: 60,
+                                //                       decoration: BoxDecoration(
+                                //                         color:
+                                //                         Colors.grey.shade300,
+                                //                         borderRadius:
+                                //                         BorderRadius.circular(
+                                //                             8),
+                                //                       ),
+                                //                     ),
+                                //                     SizedBox(height: 20.0),
+                                //                     Container(
+                                //                       width:
+                                //                       100,
+                                //                       // Explicitly set the width of the leading widget
+                                //                       height:
+                                //                       100,
+                                //                       // Explicitly set the height of the leading widget
+                                //                       child: ClipRRect(
+                                //                         borderRadius:
+                                //                         BorderRadius.circular(
+                                //                             5.0),
+                                //                         child: Image.network(
+                                //                           doc.url,
+                                //                           fit: BoxFit.cover,
+                                //                         ),
+                                //                       ),
+                                //                     ),
+                                //                     SizedBox(height: 20.0),
+                                //                     Text(
+                                //                         getShortenedText(
+                                //                             doc.documentName),
+                                //                         style: TextStyle(
+                                //                             fontSize: 16.0,
+                                //                             fontWeight:
+                                //                             FontWeight.w600)),
+                                //                     Text(
+                                //                         DateFormat(
+                                //                             'MMMM dd, yyyy, hh:mm:ss a')
+                                //                             .format(DateTime.parse(doc
+                                //                             .createdDateWithTime)),
+                                //                         style: TextStyle(
+                                //                             fontSize: 12.0)),
+                                //                     SizedBox(height: 10.0),
+                                //                     Container(
+                                //                       height: 0.15,
+                                //                       color: Colors.grey,
+                                //                     ),
+                                //                     Expanded(
+                                //                       child: ListView(
+                                //                         children: [
+                                //                           ListTile(
+                                //                             leading: Icon(
+                                //                                 Symbols.keep_pin),
+                                //                             title: Text('Pin'),
+                                //                             onTap: () {
+                                //                               // Handle tap action
+                                //                             },
+                                //                           ),
+                                //                           ListTile(
+                                //                             leading:
+                                //                             Icon(Icons.star),
+                                //                             title:
+                                //                             Text('Favorite'),
+                                //                             onTap: () async {
+                                //                               await archiveFavorite(
+                                //                                   doc.documentId,
+                                //                                   doc.shareId,
+                                //                                   doc.isFavorite);
+                                //                               setState(() {
+                                //                                 fetchDocuments(
+                                //                                     isRefresh:
+                                //                                     true);
+                                //                               });
+                                //                               Navigator.pop(
+                                //                                   context);
+                                //                             },
+                                //                           ),
+                                //                           ListTile(
+                                //                             leading:
+                                //                             Icon(Icons.mail),
+                                //                             title: Text('Unread'),
+                                //                             onTap: () {
+                                //                               // Handle tap action
+                                //                             },
+                                //                           ),
+                                //                           ListTile(
+                                //                             leading: Icon(
+                                //                                 Icons.delete),
+                                //                             title: Text('Delete'),
+                                //                             onTap: () async {
+                                //                               await archiveTrash(
+                                //                                   doc.shareId,
+                                //                                   doc.documentId);
+                                //                               setState(() {
+                                //                                 fetchDocuments(
+                                //                                     isRefresh:
+                                //                                     true);
+                                //                               });
+                                //                               Navigator.pop(
+                                //                                   context);
+                                //                             },
+                                //                           ),
+                                //                         ],
+                                //                       ),
+                                //                     )
+                                //                   ],
+                                //                 ),
+                                //               ),
+                                //             );
+                                //           },
+                                //         );
+                                //       },
+                                //     ),
+                                //   ],
+                                // ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => DocDetails(
+                                        documentId : doc.documentId.toString(),
+                                        referenceId: '0',
+                                        shareId: doc.shareId.toString(),
+                                        createdBy: userData['userId'].toString(),
+                                        organizationId: userData['organizationid'].toString() ,
+                                        documentName:doc.documentName
+
+                                    )),
+                                  );
+                                },
                               ),
-                              // Padding(
-                              //   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              //   child: Text(
-                              //     doc.userName,
-                              //     style: TextStyle(
-                              //       fontSize: 11,
-                              //       color: doc.isRead ? Colors.black : Colors.blue,
-                              //     ),
-                              //   ),
-                              // ),
-                              // Padding(
-                              //   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              //   child: Text(
-                              //     getShortenedText(doc.description),
-                              //     style: TextStyle(
-                              //       fontSize: 9,
-                              //       color: doc.isRead ? Colors.grey : Colors.blue,
-                              //     ),
-                              //   ),
-                              // ),
+                              Container(
+                                height: 0.15,
+                                color: Colors.grey,
+                              ),
                             ],
-                          ),
-                        ),
+                          )
                       );
                     },
                   )))
+          )
+              // :
+          // Expanded(
+          //     child: SmartRefresher(
+          //         controller: _refreshControllerForMainArchiveList,
+          //         onRefresh: () async {
+          //           // Reset the page and fetch again
+          //           await fetchDocuments(isRefresh: true);
+          //           _refreshControllerForMainArchiveList.refreshCompleted();
+          //         },
+          //         enablePullUp: true,
+          //         enablePullDown: true,
+          //         onLoading: () async {
+          //           print('working');
+          //           // Load more documents
+          //           await fetchDocuments(isRefresh: false);
+          //         },
+          //         child:GridView.builder(
+          //           itemCount: pinDocuments.length + documents.length,
+          //           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          //             crossAxisCount: 2,
+          //             crossAxisSpacing: 8.0,
+          //             mainAxisSpacing: 0.0, // No vertical spacing between grid items
+          //             childAspectRatio: 1.25,
+          //           ),
+          //           itemBuilder: (context, index) {
+          //             final isPinDocument = index < pinDocuments.length;
+          //             final doc = isPinDocument
+          //                 ? pinDocuments[index]
+          //                 : documents[index - pinDocuments.length];
+          //
+          //             return Card(
+          //               elevation: 4.0,
+          //               margin: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 0.0), // No bottom margin
+          //               child: InkWell(
+          //                 onTap: () {
+          //                   Navigator.push(
+          //                     context,
+          //                     MaterialPageRoute(builder: (context) => DocDetails(
+          //                       documentId : doc.documentId.toString(),
+          //                       referenceId: '0',
+          //                       shareId: doc.shareId.toString(),
+          //                       createdBy: userData['userId'].toString(),
+          //                       organizationId: userData['organizationid'].toString() ,
+          //                       documentName:doc.documentName
+          //
+          //                     )),
+          //                   );
+          //                 },
+          //                 child: Column(
+          //                   crossAxisAlignment: CrossAxisAlignment.start,
+          //                   mainAxisAlignment: MainAxisAlignment.spaceBetween, // Push content to top and bottom
+          //                   children: [
+          //                     Row(
+          //                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //                       children: [
+          //                         Flexible(
+          //                           child: Row(
+          //                             children: [
+          //                               _getFileIconForActivity(doc.documentName),
+          //                               SizedBox(width: 5.0),
+          //                               Flexible(
+          //                                 child: Text(
+          //                                   getShortenedText(doc.documentName),
+          //                                   style: TextStyle(
+          //                                     fontSize: 12.0,
+          //                                     fontWeight: FontWeight.w600,
+          //                                   ),
+          //                                   overflow: TextOverflow.ellipsis,
+          //                                 ),
+          //                               ),
+          //                             ],
+          //                           ),
+          //                         ),
+          //                         IconButton(
+          //                           icon: Icon(
+          //                             Icons.more_vert_outlined,
+          //                             size: 20.0,
+          //                             color: Colors.grey,
+          //                           ),
+          //                           onPressed: () {
+          //                             showModalBottomSheet(
+          //                               context: context,
+          //                               builder: (BuildContext context) {
+          //                                 return Container(
+          //                                   height: 450,
+          //                                   width: double.infinity,
+          //                                   color: Colors.white,
+          //                                   child: Padding(
+          //                                     padding: const EdgeInsets.only(top: 20.0),
+          //                                     child: Column(
+          //                                       children: [
+          //                                         Container(
+          //                                           height: 5,
+          //                                           width: 60,
+          //                                           decoration: BoxDecoration(
+          //                                             color: Colors.grey.shade300,
+          //                                             borderRadius: BorderRadius.circular(8),
+          //                                           ),
+          //                                         ),
+          //                                         SizedBox(height: 20.0),
+          //                                         // Container(
+          //                                         //   width: 80,
+          //                                         //   height: 100,
+          //                                         //
+          //                                         //   child: ClipRRect(
+          //                                         //     borderRadius: BorderRadius.circular(5.0),
+          //                                         //     child: Image.network(
+          //                                         //       doc.url,
+          //                                         //       fit: BoxFit.cover,
+          //                                         //     ),
+          //                                         //   ),
+          //                                         // ),
+          //                                         Container(
+          //                                           width: 100,
+          //                                           height: 100, // Adjust to 80 if desired
+          //                                           alignment: Alignment.bottomCenter,
+          //
+          //                                           child: ClipRRect(
+          //                                             borderRadius: BorderRadius.circular(5.0),
+          //                                             child: Image.network(
+          //                                               doc.url,
+          //                                               fit: BoxFit.cover,
+          //                                             ),
+          //                                           ),
+          //                                         ),
+          //                                         SizedBox(height: 20.0),
+          //                                         Text(
+          //                                           DateFormat('MMMM dd, yyyy, hh:mm:ss a')
+          //                                               .format(DateTime.parse(doc.createdDateWithTime)),
+          //                                           style: TextStyle(fontSize: 12.0),
+          //                                         ),
+          //                                         SizedBox(height: 10.0),
+          //                                         Container(
+          //                                           height: 0.15,
+          //                                           color: Colors.grey,
+          //                                         ),
+          //                                         Expanded(
+          //                                           child: ListView(
+          //                                             children: [
+          //                                               ListTile(
+          //                                                 leading: Icon(Symbols.keep_pin),
+          //                                                 title: Text('Pin'),
+          //                                                 onTap: () {},
+          //                                               ),
+          //                                               ListTile(
+          //                                                 leading: Icon(Icons.star),
+          //                                                 title: Text('Favorite'),
+          //                                                 onTap: () async {
+          //                                                   await archiveFavorite(
+          //                                                       doc.documentId,
+          //                                                       doc.shareId,
+          //                                                       doc.isFavorite);
+          //                                                   setState(() {
+          //                                                     fetchDocuments(isRefresh: true);
+          //                                                   });
+          //                                                   Navigator.pop(context);
+          //                                                 },
+          //                                               ),
+          //                                               ListTile(
+          //                                                 leading: Icon(Icons.mail),
+          //                                                 title: Text('Unread'),
+          //                                                 onTap: () {},
+          //                                               ),
+          //                                               ListTile(
+          //                                                 leading: Icon(Icons.delete),
+          //                                                 title: Text('Delete'),
+          //                                                 onTap: () async {
+          //                                                   await archiveTrash(
+          //                                                       doc.shareId, doc.documentId);
+          //                                                   setState(() {
+          //                                                     fetchDocuments(isRefresh: true);
+          //                                                   });
+          //                                                   Navigator.pop(context);
+          //                                                 },
+          //                                               ),
+          //                                             ],
+          //                                           ),
+          //                                         ),
+          //                                       ],
+          //                                     ),
+          //                                   ),
+          //                                 );
+          //                               },
+          //                             );
+          //                           },
+          //                         ),
+          //                       ],
+          //                     ),
+          //                     Expanded( // Wrap the image Row in Expanded to fill remaining space
+          //                       child: Row(
+          //                         mainAxisAlignment: MainAxisAlignment.center,
+          //                         children: [
+          //                           Container(
+          //                             height: 100, // Fill the available height
+          //                             width: 130,
+          //                             decoration: BoxDecoration(
+          //                               border: material.Border(
+          //                                 left: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
+          //                                 top: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
+          //                                 right: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
+          //                               ),
+          //                               borderRadius: material.BorderRadius.circular(10.0),
+          //                             ),
+          //                             child: ClipRRect(
+          //                               borderRadius: BorderRadius.zero,
+          //                               child: Image.network(
+          //                                 doc.url,
+          //                                 fit: BoxFit.cover,
+          //                               ),
+          //                             ),
+          //                           ),
+          //                         ],
+          //                       ),
+          //                     ),
+          //                   ],
+          //                 ),
+          //               ),
+          //             );
+          //           },
+          //         )
+          //     )
+          // )
         ],
       ),
 
-      // Favorite page
+      // Favorite page Bind here
       isLoading
           ? Center(child:LoadingAnimationWidget.inkDrop(
         color: Colors.deepOrange,
@@ -926,161 +1073,113 @@ class _AllDocListState extends State<AllDocList> {
           itemCount: favoriteDocuments.length,
           itemBuilder: (context, index) {
             final doc = favoriteDocuments[index];
-            return ListTile(
-              contentPadding:
-              const EdgeInsets.only(left: 8.0, right: 0.0),
-              leading: Container(
-                width:
-                50, // Explicitly set the width of the leading widget
-                height:
-                50, // Explicitly set the height of the leading widget
-                child: ClipRRect(
-                  borderRadius: BorderRadius
-                      .zero, // Removes the circle and gives a square look
-                  child: Image.network(
-                    doc.url,
-                    fit: BoxFit
-                        .cover, // Ensures the image fits properly
-                  ),
-                ),
-              ),
-              title: Text(getShortenedText(doc.documentName),
-                  style: TextStyle(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w600,
-                      color:
-                      doc.isRead ? Colors.black : Colors.blue)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment
-                    .start, // Aligns the text to the left
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Text(
-                    doc.userName,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color:
-                        doc.isRead ? Colors.black : Colors.blue),
-                  ),
-                  Text(
-                    getShortenedText(doc.description),
-                    style: TextStyle(
-                        fontSize: 9,
-                        color:
-                        doc.isRead ? Colors.grey : Colors.blue),
-                  ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize
-                    .min, // Ensures the Row only takes up necessary space
-                children: [
-                  if (doc.isFavorite == true)
-                    Icon(
-                      LineAwesomeIcons.star,
-                      size: 15,
-                      color: Colors.yellow.shade800,
-                    ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.more_vert_outlined,
-                      size: 20.0,
-                      color: Colors.grey,
-                    ),
-                    onPressed: () {
-                      print("More icon tapped");
+            return Column(
+              children: [
+                ListTile(
 
-                      // Show the bottom sheet
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return Container(
-                            height:
-                            300, // Set the height of the bottom sheet
-                            width: double.infinity,
-                            color: Colors
-                                .white, // Background color of the bottom sheet
-                            child: Padding(
-                              padding:
-                              const EdgeInsets.only(top: 20.0),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    height: 5,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius:
-                                      BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  SizedBox(height: 20.0),
-                                  Container(
-                                    width:
-                                    100,
-                                    // Explicitly set the width of the leading widget
-                                    height:
-                                    100,
-                                    // Explicitly set the height of the leading widget
-                                    child: ClipRRect(
-                                      borderRadius:
-                                      BorderRadius.circular(5.0),
-                                      child: Image.network(
-                                        doc.url,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 20.0),
-                                  Text(
-                                      getShortenedText(
-                                          doc.documentName),
-                                      style: TextStyle(
-                                          fontSize: 16.0,
-                                          fontWeight:
-                                          FontWeight.w600)),
-                                  Text(
-                                      DateFormat(
-                                          'MMMM dd, yyyy, hh:mm:ss a')
-                                          .format(DateTime.parse(
-                                          doc.createdDate)),
-                                      style:
-                                      TextStyle(fontSize: 12.0)),
-                                  SizedBox(height: 10.0),
-                                  Container(
-                                    height: 0.15,
-                                    color: Colors.grey,
-                                  ),
-                                  Expanded(
-                                    child: ListView(
-                                      children: [
-                                        ListTile(
-                                          leading: Icon(Icons.star),
-                                          title: Text('Favorite'),
-                                          onTap: () {
-                                            // Handle tap action if needed
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
+                  contentPadding: const EdgeInsets.only(
+                      left: 8.0, right: 8.0),
+                  minLeadingWidth: 10,
+                  horizontalTitleGap: 2,
+                  // leading: Container(
+                  //   width:
+                  //   50, // Explicitly set the width of the leading widget
+                  //   height:
+                  //   50, // Explicitly set the height of the leading widget
+                  //   child: ClipRRect(
+                  //     borderRadius: BorderRadius
+                  //         .zero, // Removes the circle and gives a square look
+                  //     child: _getFileIconForActivity(doc.documentName),
+                  //   ),
+                  // ),
+
+                  title: Text(getShortenedText(doc.documentName),
+                      style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
+                          color:
+                          doc.isRead ? Colors.black : Colors.blue)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment
+                        .start, // Aligns the text to the left
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc.userName,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color:
+                            doc.isRead ? Colors.black : Colors.blue),
+                      ),
+                      Text(
+                        getShortenedText(doc.description),
+                        style: TextStyle(
+                            fontSize: 9,
+                            color:
+                            doc.isRead ? Colors.grey : Colors.blue),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              onTap: () {
-                print('Tapped on list');
-              },
+
+                  trailing: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Show version only if versionName is not null or empty
+                      if (doc.versionName.isNotEmpty)
+                        Container(
+                          color: Colors.grey[200],
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            "Version ${doc.versionName}",
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: doc.isRead ? Colors.black : Colors.blue,
+                            ),
+                          ),
+                        ),
+
+                      SizedBox(height: 5),
+
+                      if (doc.createdDateString != null && doc.createdDateString.isNotEmpty)
+                        Text(
+                          doc.createdDateString.toString(),
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: doc.isRead ? Colors.black : Colors.blue,
+                          ),
+                        ),
+
+                    ],
+                  ),
+
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => DocDetails(
+                          documentId : doc.documentId.toString(),
+                          referenceId: '0',
+                          shareId: doc.sharedId.toString(),
+                          createdBy: userData['userId'].toString(),
+                          organizationId: userData['organizationid'].toString() ,
+                          documentName:doc.documentName
+
+                      )),
+                    );
+                  },
+                ),
+                Container(
+                  height: 0.15,
+                  color: Colors.grey,
+                ),
+              ],
             );
           },
         ),
       ),
+
+
+      ////////Trash list Bind form here
+
       isLoading
           ? Center(child: LoadingAnimationWidget.inkDrop(
         color: Colors.deepOrange,
@@ -1099,149 +1198,92 @@ class _AllDocListState extends State<AllDocList> {
           itemBuilder: (context, index) {
             final doc = trashItems[index];
 
-            return ListTile(
-              leading: Container(
-                width:
-                50, // Explicitly set the width of the leading widget
-                height:
-                50, // Explicitly set the height of the leading widget
-                child: ClipRRect(
-                  borderRadius: BorderRadius
-                      .zero, // Removes the circle and gives a square look
-                  child: Image.network(
-                    doc.url,
-                    fit: BoxFit
-                        .cover, // Ensures the image fits properly
+            return Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.only(
+                      left: 8.0, right: 8.0),
+                  minLeadingWidth: 10,
+                  horizontalTitleGap: 2,
+                  // leading: Container(
+                  //   width:
+                  //   50, // Explicitly set the width of the leading widget
+                  //   height:
+                  //   50, // Explicitly set the height of the leading widget
+                  //   child: ClipRRect(
+                  //     borderRadius: BorderRadius
+                  //         .zero, // Removes the circle and gives a square look
+                  //     child:  _getFileIconForActivity(doc.documentName),
+                  //   ),
+                  // ),
+                  title: Text(getShortenedText(doc.documentName),
+                      style: TextStyle(
+                          fontSize: 12.0,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment
+                        .start, // Aligns the text to the left
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc.documentName,
+                        style:
+                        TextStyle(fontSize: 11, color: Colors.black),
+                      ),
+                      Text(
+                        getShortenedText(doc.description),
+                        style: TextStyle(fontSize: 9, color: Colors.grey),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              title: Text(getShortenedText(doc.documentName),
-                  style: TextStyle(
-                      fontSize: 12.0,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment
-                    .start, // Aligns the text to the left
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Text(
-                    doc.documentName,
-                    style:
-                    TextStyle(fontSize: 11, color: Colors.black),
-                  ),
-                  Text(
-                    getShortenedText(doc.description),
-                    style: TextStyle(fontSize: 9, color: Colors.grey),
-                  ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize
-                    .min, // Ensures the Row only takes up necessary space
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.more_vert_outlined,
-                      size: 20.0,
-                      color: Colors.grey,
-                    ),
-                    onPressed: () {
-                      print("More icon tapped");
-
-                      // Show the bottom sheet
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return Container(
-                            height:
-                            300, // Set the height of the bottom sheet
-                            width: double.infinity,
-                            color: Colors
-                                .white, // Background color of the bottom sheet
-                            child: Padding(
-                              padding:
-                              const EdgeInsets.only(top: 20.0),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    height: 5,
-                                    width: 60,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade300,
-                                      borderRadius:
-                                      BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  SizedBox(height: 20.0),
-                                  Container(
-                                    width:
-                                    100,
-                                    // Explicitly set the width of the leading widget
-                                    height:
-                                    100,
-                                    // Explicitly set the height of the leading widget
-                                    child: ClipRRect(
-                                      borderRadius:
-                                      BorderRadius.circular(5.0),
-                                      child: Image.network(
-                                        doc.url,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(height: 20.0),
-                                  Text(
-                                      getShortenedText(
-                                          doc.documentName),
-                                      style: TextStyle(
-                                          fontSize: 16.0,
-                                          fontWeight:
-                                          FontWeight.w600)),
-                                  Text(
-                                      DateFormat(
-                                          'MMMM dd, yyyy, hh:mm:ss a')
-                                          .format(DateTime.parse(
-                                          doc.createdDate)),
-                                      style:
-                                      TextStyle(fontSize: 12.0)),
-                                  SizedBox(height: 10.0),
-                                  Container(
-                                    height: 0.15,
-                                    color: Colors.grey,
-                                  ),
-                                  Expanded(
-                                    child: ListView(
-                                      children: [
-                                        ListTile(
-                                          leading: Icon(Symbols
-                                              .restore_from_trash),
-                                          title: Text('Restore'),
-                                          onTap: () {
-                                            // Handle tap action
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                ],
-                              ),
+                  trailing: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Show version only if versionName is not null or empty
+                      if (doc.versionName.isNotEmpty)
+                        Container(
+                          color: Colors.grey[200],
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            "Version ${doc.versionName}",
+                            style: TextStyle(
+                              fontSize: 8,
+                              color: doc.isRead ? Colors.black : Colors.blue,
                             ),
-                          );
-                        },
-                      );
-                    },
+                          ),
+                        ),
+
+                      SizedBox(height: 5),
+
+                      if (doc.createdDateString != null && doc.createdDateString.isNotEmpty)
+                        Text(
+                          doc.createdDateString.toString(),
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: doc.isRead ? Colors.black : Colors.blue,
+                          ),
+                        ),
+
+                    ],
                   ),
-                ],
-              ),
-              onTap: () {
-                print('Tapped on list');
-              },
+                  onTap: () {
+                    print('Tapped on list');
+                  },
+                ),
+                Container(
+                  height: 0.15,
+                  color: Colors.grey,
+                ),
+              ],
             );
           },
         ),
       ),
 
+
+
+      //Share options here
       Column(
         children: [
           Row(
@@ -1318,164 +1360,87 @@ class _AllDocListState extends State<AllDocList> {
                   itemBuilder: (context, index) {
                     final doc = shareWithMeList[index];
 
-                    return ListTile(
-                      leading: Container(
-                        width:
-                        50, // Explicitly set the width of the leading widget
-                        height:
-                        50, // Explicitly set the height of the leading widget
-                        child: ClipRRect(
-                          borderRadius: BorderRadius
-                              .zero,
-                          // Removes the circle and gives a square look
-                          child: Image.network(
-                            doc.url,
-                            fit: BoxFit
-                                .cover, // Ensures the image fits properly
-                          ),
-                        ),
-                      ),
-                      title: Text(getShortenedText(doc.documentName),
-                          style: TextStyle(
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment
-                            .start, // Aligns the text to the left
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Text(
-                            doc.documentName,
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.black),
-                          ),
-                          Text(
-                            getShortenedText(doc.description),
-                            style: TextStyle(
-                                fontSize: 9, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize
-                            .min,
-                        // Ensures the Row only takes up necessary space
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.more_vert_outlined,
-                              size: 20.0,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              print("More icon tapped");
+                    return Column(
+                      children: [
+                        ListTile(
+                          contentPadding: const EdgeInsets.only(
+                              left: 8.0, right: 8.0),
+                          minLeadingWidth: 10,
+                          horizontalTitleGap: 2,
+                          // leading: Container(
+                          //   width:
+                          //   50, // Explicitly set the width of the leading widget
+                          //   height:
+                          //   50, // Explicitly set the height of the leading widget
+                          //   child: ClipRRect(
+                          //     borderRadius: BorderRadius
+                          //         .zero,
+                          //     // Removes the circle and gives a square look
+                          //     child: _getFileIconForActivity(doc.documentName),
+                          //   ),
+                          // ),
+                          title: Text(getShortenedText(doc.documentName),
+                              style: TextStyle(
+                                  fontSize: 12.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment
+                                .start, // Aligns the text to the left
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                doc.documentName,
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.black),
+                              ),
 
-                              // Show the bottom sheet
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return Container(
-                                    height:
-                                    350,
-                                    // Set the height of the bottom sheet
-                                    width: double.infinity,
-                                    color: Colors
-                                        .white,
-                                    // Background color of the bottom sheet
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 20.0),
-                                      child: Column(
-                                        children: [
-                                          Container(
-                                            height: 5,
-                                            width: 60,
-                                            decoration: BoxDecoration(
-                                              color: Colors
-                                                  .grey.shade300,
-                                              borderRadius:
-                                              BorderRadius
-                                                  .circular(8),
-                                            ),
-                                          ),
-                                          SizedBox(height: 20.0),
-                                          Container(
-                                            width:
-                                            100,
-                                            // Explicitly set the width of the leading widget
-                                            height:
-                                            100,
-                                            // Explicitly set the height of the leading widget
-                                            child: ClipRRect(
-                                              borderRadius:
-                                              BorderRadius
-                                                  .circular(5.0),
-                                              child: Image.network(
-                                                doc.url,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          ),
-                                          SizedBox(height: 20.0),
-                                          Text(
-                                              getShortenedText(
-                                                  doc.documentName),
-                                              style: TextStyle(
-                                                  fontSize: 16.0,
-                                                  fontWeight:
-                                                  FontWeight
-                                                      .w600)),
-                                          Text(
-                                              DateFormat(
-                                                  'MMMM dd, yyyy, hh:mm:ss a')
-                                                  .format(DateTime
-                                                  .parse(doc
-                                                  .createdDate)),
-                                              style: TextStyle(
-                                                  fontSize: 12.0)),
-                                          SizedBox(height: 10.0),
-                                          Container(
-                                            height: 0.15,
-                                            color: Colors.grey,
-                                          ),
-                                          Expanded(
-                                            child: ListView(
-                                              children: [
-                                                ListTile(
-                                                  leading: Icon(
-                                                      Symbols
-                                                          .keep_pin),
-                                                  title: Text('Pin'),
-                                                  onTap: () {
-                                                    // Handle tap action
-                                                  },
-                                                ),
-                                                ListTile(
-                                                  leading: Icon(
-                                                      Icons.star),
-                                                  title: Text(
-                                                      'Favorite'),
-                                                  onTap: () {
-                                                    // Handle tap action if needed
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
+                              // Text(
+                              //   getShortenedText(doc.description),
+                              //   style: TextStyle(
+                              //       fontSize: 9, color: Colors.grey),
+                              // ),
+                            ],
                           ),
-                        ],
-                      ),
-                      onTap: () {
-                        print('Tapped on list');
-                      },
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // Show version only if versionName is not null or empty
+                              if (doc.versionName.isNotEmpty)
+                                Container(
+                                  color: Colors.grey[200],
+                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Text(
+                                    "Version ${doc.versionName}",
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: doc.isRead ? Colors.black : Colors.blue,
+                                    ),
+                                  ),
+                                ),
+
+                              SizedBox(height: 5),
+
+                              if (doc.createdDateString != null && doc.createdDateString.isNotEmpty)
+                                Text(
+                                  doc.createdDateString.toString(),
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: doc.isRead ? Colors.black : Colors.blue,
+                                  ),
+                                ),
+
+                            ],
+                          ),
+                          onTap: () {
+                            print('Tapped on list');
+                          },
+                        ),
+                        Container(
+                          height: 0.15,
+                          color: Colors.grey,
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -1502,164 +1467,86 @@ class _AllDocListState extends State<AllDocList> {
                   itemBuilder: (context, index) {
                     final doc = shareByMeList[index];
 
-                    return ListTile(
-                      leading: Container(
-                        width:
-                        50, // Explicitly set the width of the leading widget
-                        height:
-                        50, // Explicitly set the height of the leading widget
-                        child: ClipRRect(
-                          borderRadius: BorderRadius
-                              .zero,
-                          // Removes the circle and gives a square look
-                          child: Image.network(
-                            doc.url,
-                            fit: BoxFit
-                                .cover, // Ensures the image fits properly
+                    return Column(
+                      children: [
+                        ListTile(
+                          contentPadding: const EdgeInsets.only(
+                              left: 8.0, right: 8.0),
+                          minLeadingWidth: 10,
+                          horizontalTitleGap: 2,
+                          // leading: Container(
+                          //   width:
+                          //   50, // Explicitly set the width of the leading widget
+                          //   height:
+                          //   50, // Explicitly set the height of the leading widget
+                          //   child: ClipRRect(
+                          //     borderRadius: BorderRadius
+                          //         .zero,
+                          //     // Removes the circle and gives a square look
+                          //     child:  _getFileIconForActivity(doc.documentName),
+                          //   ),
+                          // ),
+                          title: Text(getShortenedText(doc.documentName),
+                              style: TextStyle(
+                                  fontSize: 12.0,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment
+                                .start, // Aligns the text to the left
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              Text(
+                                doc.documentName,
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.black),
+                              ),
+                              // Text(
+                              //   getShortenedText(doc.description),
+                              //   style: TextStyle(
+                              //       fontSize: 9, color: Colors.grey),
+                              // ),
+                            ],
                           ),
-                        ),
-                      ),
-                      title: Text(getShortenedText(doc.documentName),
-                          style: TextStyle(
-                              fontSize: 12.0,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment
-                            .start, // Aligns the text to the left
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Text(
-                            doc.documentName,
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.black),
-                          ),
-                          Text(
-                            getShortenedText(doc.description),
-                            style: TextStyle(
-                                fontSize: 9, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize
-                            .min,
-                        // Ensures the Row only takes up necessary space
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.more_vert_outlined,
-                              size: 20.0,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              print("More icon tapped");
-
-                              // Show the bottom sheet
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return Container(
-                                    height:
-                                    350,
-                                    // Set the height of the bottom sheet
-                                    width: double.infinity,
-                                    color: Colors
-                                        .white,
-                                    // Background color of the bottom sheet
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                          top: 20.0),
-                                      child: Column(
-                                        children: [
-                                          Container(
-                                            height: 5,
-                                            width: 60,
-                                            decoration: BoxDecoration(
-                                              color: Colors
-                                                  .grey.shade300,
-                                              borderRadius:
-                                              BorderRadius
-                                                  .circular(8),
-                                            ),
-                                          ),
-                                          SizedBox(height: 20.0),
-                                          Container(
-                                            width:
-                                            100,
-                                            // Explicitly set the width of the leading widget
-                                            height:
-                                            100,
-                                            // Explicitly set the height of the leading widget
-                                            child: ClipRRect(
-                                              borderRadius:
-                                              BorderRadius
-                                                  .circular(5.0),
-                                              child: Image.network(
-                                                doc.url,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          ),
-                                          SizedBox(height: 20.0),
-                                          Text(
-                                              getShortenedText(
-                                                  doc.documentName),
-                                              style: TextStyle(
-                                                  fontSize: 16.0,
-                                                  fontWeight:
-                                                  FontWeight
-                                                      .w600)),
-                                          Text(
-                                              DateFormat(
-                                                  'MMMM dd, yyyy, hh:mm:ss a')
-                                                  .format(DateTime
-                                                  .parse(doc
-                                                  .createdDate)),
-                                              style: TextStyle(
-                                                  fontSize: 12.0)),
-                                          SizedBox(height: 10.0),
-                                          Container(
-                                            height: 0.15,
-                                            color: Colors.grey,
-                                          ),
-                                          Expanded(
-                                            child: ListView(
-                                              children: [
-                                                ListTile(
-                                                  leading: Icon(
-                                                      Symbols
-                                                          .keep_pin),
-                                                  title: Text('Pin'),
-                                                  onTap: () {
-                                                    // Handle tap action
-                                                  },
-                                                ),
-                                                ListTile(
-                                                  leading: Icon(
-                                                      Icons.star),
-                                                  title: Text(
-                                                      'Favorite'),
-                                                  onTap: () {
-                                                    // Handle tap action if needed
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          )
-                                        ],
-                                      ),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              // Show version only if versionName is not null or empty
+                              if (doc.versionName.isNotEmpty)
+                                Container(
+                                  color: Colors.grey[200],
+                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Text(
+                                    "Version ${doc.versionName}",
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: doc.isRead ? Colors.black : Colors.blue,
                                     ),
-                                  );
-                                },
-                              );
-                            },
+                                  ),
+                                ),
+
+                              SizedBox(height: 5),
+
+                              if (doc.createdDateString != null && doc.createdDateString.isNotEmpty)
+                                Text(
+                                  doc.createdDateString.toString(),
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: doc.isRead ? Colors.black : Colors.blue,
+                                  ),
+                                ),
+
+                            ],
                           ),
-                        ],
-                      ),
-                      onTap: () {
-                        print('Tapped on list');
-                      },
+                          onTap: () {
+                            print('Tapped on list');
+                          },
+                        ),
+                        Container(
+                          height: 0.15,
+                          color: Colors.grey,
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -1677,7 +1564,7 @@ class _AllDocListState extends State<AllDocList> {
     });
 
     if (index == 0) {
-      fetchDocuments(isRefresh: true);
+      fetchDocuments(isRefresh: true, cabinetId: cabinetId);
     } else if (index == 1) {
       _isLoading = true;
       fetchFavoriteDocuments();
@@ -1704,13 +1591,18 @@ class _AllDocListState extends State<AllDocList> {
 
   Future<void> _initialize() async {
     await _loadUserData();
-    fetchDocuments(isRefresh: true);
+    await fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+    fetchCabinetData();
+    await fetchLabels();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        toolbarHeight : 42,
         leading: Stack(
           alignment: Alignment.center,
           children: [
@@ -1730,7 +1622,7 @@ class _AllDocListState extends State<AllDocList> {
                     userData['userProfile'] == 'NA'
                     ? null // No image if the condition is true
                     : NetworkImage(
-                    "https://yrglobaldocuments.blob.core.windows.net/documents/" +
+                    "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" +
                         userData['userProfile']),
                 child: userData['userProfile'] == null ||
                     userData['userProfile'] == '' ||
@@ -1743,24 +1635,419 @@ class _AllDocListState extends State<AllDocList> {
           ],
         ),
         title: const Text('Stream Archive'),
+        actions: [
+
+
+          IconButton(
+              onPressed: () {
+                // Ensure _activeTile is not null or empty
+                if (_selectedIndex == 0) {
+                  //_handleSearch(context); // Call search if it's get the data for option in search
+                  //   _showBottomSheet(context);
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return Container(
+                        padding: EdgeInsets.all(16),
+                        height: 250,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Search',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 16),
+                            TextField(
+                              decoration: InputDecoration(
+                                hintText: 'Type to search...',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            // Add more widgets if needed
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                } else {
+                  // Toggle search bar visibility
+                  setState(() {
+                    _showSearchBar = !_showSearchBar;
+
+                    // If the search bar is hidden, clear the search field and reload favorite memos
+                    if (!_showSearchBar) {
+                      searchController.clear(); // Clear the TextField input
+                      // _loadFavoriteMemos(
+                      //     isRefresh: true); // Reload favorite memos
+                    }
+                  });
+                }
+              },
+              icon: SvgPicture.asset(
+                'assets/svg_icons/search_icon.svg', // Ensure Symbols.search is properly defined or imported
+
+                color: (_selectedIndex == 0)
+                    ? Colors
+                    .blue // If conditions are met, set the color to blue
+                    : null, // Default color (if not matching conditions)
+              )),
+
+
+
+
+          Builder(
+            builder: (context) {
+              return IconButton(
+                padding: EdgeInsets.zero,
+                alignment: Alignment.center,
+                iconSize: 20,
+                icon: SvgPicture.asset(
+                  'assets/svg_icons/cabinate_icon.svg',
+                  width: 20,
+                  height: 20,
+                  // You can also specify color here if needed
+                  // color: Colors.white,
+                ),
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+              );
+            },
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(
+              _showSearchBar && _selectedIndex != 0 ? 80 : 30),
+          child: Column(
+            children: [
+              if (_showSearchBar && _selectedIndex != 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 5.0, vertical: 5.0),
+                  child: Container(
+                    height: 35,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20.0),
+                      // border: Border.all(color: Colors.grey),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: 15.0,
+                      ),
+                      child: TextField(
+                        controller: searchController,
+                        // autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: 'Search...',
+                          hintStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14.0,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 10.0),
+                        ),
+                        style: const TextStyle(
+                            color: Colors.black, fontSize: 14.0),
+                        cursorHeight: 22.0,
+                        onChanged: (query) {
+                          if (_selectedIndex == 1) {
+                            setState(() {
+                              _searchQuery = query;
+                            });
+                            fetchFavoriteDocuments(query: _searchQuery);
+                          }
+                          if (_selectedIndex == 2) {
+                            setState(() {
+                              _searchQuery = query;
+                              //_loadSentMemos(isRefresh: true);
+                            });
+                          }
+                          if (_selectedIndex == 3 && isShareWithMeActive) {
+                            setState(() {
+                              _searchQuery = query;
+
+                            });
+                            fetchShareWithMeList(query: _searchQuery);
+                          }
+                          if (_selectedIndex == 3 && !isShareWithMeActive) {
+                            setState(() {
+                              _searchQuery = query;
+
+                            });
+                            fetchShareByMeList(query: _searchQuery);
+                          }
+                         else {
+                            _searchQuery = query;
+                            // filterMemos();
+                            print(_searchQuery);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+
+            ],
+          ),
+        ),
       ),
+
+      drawer: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(30.0),
+          bottomRight: Radius.circular(30.0),
+        ),
+        child: Drawer(
+          child:Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 50.0, left: 15.0),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => PersonalInformation(
+                              loginUserId: userData['userId'])),
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      // Padding(
+                      //   padding: const EdgeInsets.only(left: 8.0),
+                      //   child: Image.asset(
+                      //     'assets/dms-logo.png',
+                      //     width: 40,
+                      //     height: 40,
+                      //   ),
+                      // ),
+                      // const Padding(
+                      //   padding: EdgeInsets.only(),
+                      //   child: Text(
+                      //     'STREAM MAIL',
+                      //     style: TextStyle(
+                      //         color: Colors.black,
+                      //         fontSize: 20,
+                      //         fontWeight: FontWeight.w400,
+                      //         fontFamily: 'AvenirNextCyr-Bold'),
+                      //   ),
+                      // ),
+
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            // border: Border.all(
+                            //   color: Colors.grey, // Border color
+                            //   width: 0.5, // Border width
+                            // ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 28.0,
+                            backgroundImage: userData['userProfile'] == null ||
+                                userData['userProfile'] == '' ||
+                                userData['userProfile'] == 'NA'
+                                ? null // No image if the condition is true
+                                : NetworkImage(
+                                "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" +
+                                    userData['userProfile']),
+                            child: userData['userProfile'] == null ||
+                                userData['userProfile'] == '' ||
+                                userData['userProfile'] == 'NA'
+                                ? Icon(Icons
+                                .person) // Show person icon if condition is true
+                                : null, // No icon if there's an image
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 10.0,
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${userData['firstName']} ${userData['lastName']}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18.0,
+                          ),
+                        ),
+                      ),
+
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Visibility(
+                          visible: userData['designationName'] != null &&
+                              userData['designationName'] != "N/A" &&
+                              userData['designationName'] != "NA" &&
+                              userData['designationName']?.isNotEmpty == true,
+                          child: Text(
+                            userData['designationName'] ?? '',
+                            style:
+                            TextStyle(fontSize: 18.0, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 10.0,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(
+                height: 10,
+                thickness: 0.2,
+                indent: 10,
+                endIndent: 10,
+                color: Colors.black,
+              ),
+              Expanded(
+                child:  ListView.builder(
+                itemCount: cabinets.length,
+                itemBuilder: (context, index) {
+                  final cabinet = cabinets[index];
+                  return ListTile(
+                    title: Text(cabinet.cabinetName ?? 'No Name'),
+                    leading: SvgPicture.asset(
+                      'assets/svg_icons/cabinate_icon.svg',
+                      width: 20,
+                      height: 20,
+                      // You can also specify color here if needed
+                      color: Colors.grey,
+                    ),
+                    trailing: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        cabinet.archiveCount.toString(),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+                    onTap: () {
+                      setState(() {
+                        cabinetId = cabinet.cabinetId!;
+                        totalDocCount = cabinet.archiveCount ?? 0;
+                        _selectedIndex = 0; // Switch to the Archive tab
+                        _isLoading = true; // Set loading state
+                      });
+                      fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+                      Navigator.pop(context); // Close the drawer after selection
+                    },
+                  );
+                },
+              ),
+              ),
+              const Divider(
+                thickness: 0.2,
+                color: Colors.black,
+                indent: 10,
+                endIndent: 10,
+              ),
+             Expanded(
+             child: labels.isEmpty
+                 ? SizedBox.shrink()
+            : ListView.builder(
+        padding: EdgeInsets.zero,
+        itemCount: labels.length,
+        itemBuilder: (context, index) {
+          final label = labels[index];
+          return ListTile(
+            minLeadingWidth: 0,
+            horizontalTitleGap: 0,
+            visualDensity:
+            VisualDensity(horizontal: 0, vertical: -4),
+            dense: true,
+            contentPadding: EdgeInsets.symmetric(
+                vertical: 0.0, horizontal: 20.0),
+            title: Text(label.labelName,
+                style: TextStyle(fontSize: 13.0)),
+            onTap: () async {
+              print('click');
+              print(label.labelId);
+             await fetchLabelArchives(label.labelId);
+              Navigator.pop(
+                  context); // Close the drawer after selection
+            },
+          );
+        },
+      ),
+             )
+
+            ],
+          )
+        ),
+      ),
+
       body: _getWidgetOptions()
           .elementAt(_selectedIndex), // Display the selected widget
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         // Ensure labels are always visible
         items: <BottomNavigationBarItem>[
+          // BottomNavigationBarItem(
+          //   icon: InkWell(
+          //     onTap: () => _onItemTapped(0), // Call function when tapped
+          //     child: SvgPicture.asset(
+          //       'assets/svg_icons/archive_inbox_icon.svg',
+          //       color: _selectedIndex == 0 ? Colors.amber[800] : Colors.grey,
+          //     ),
+          //   ),
+          //   label: 'Archive',
+          //   tooltip: 'Archive',
+          // ),
           BottomNavigationBarItem(
             icon: InkWell(
-              onTap: () => _onItemTapped(0), // Call function when tapped
-              child: SvgPicture.asset(
-                'assets/svg_icons/archive_inbox_icon.svg',
-                color: _selectedIndex == 0 ? Colors.amber[800] : Colors.grey,
+              onTap: () => _onItemTapped(0),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SvgPicture.asset(
+                    'assets/svg_icons/archive_inbox_icon.svg',
+                    color: _selectedIndex == 0 ? Colors.amber[800] : Colors.grey,
+                  ),
+                  if (totalDocCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$totalDocCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             label: 'Archive',
             tooltip: 'Archive',
           ),
+
           BottomNavigationBarItem(
             icon: InkWell(
               onTap: () => _onItemTapped(1),
@@ -1812,85 +2099,52 @@ class _AllDocListState extends State<AllDocList> {
         // Color of the selected item
         onTap: _onItemTapped, // Callback when an item is tapped
       ),
-      floatingActionButton: FloatingActionButton(
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: () {
+      //     _openFilePicker();
+      //   },
+      //   child: Icon(Icons.add, color: Colors.white),
+      //   backgroundColor: Colors.deepOrange,
+      // ),
+      floatingActionButton: cabinetId != 0
+          ? FloatingActionButton(
         onPressed: () {
-          // showModalBottomSheet(
-          //   context: context,
-          //   builder: (BuildContext context) {
-          //     return Container(
-          //       height: 400, // Set the height of the bottom sheet
-          //       width: double.infinity,
-          //       color: Colors.white,
-          //       child: Column(
-          //         crossAxisAlignment: CrossAxisAlignment.start,
-          //         mainAxisAlignment: MainAxisAlignment.start,
-          //         children: [
-          //           SizedBox(
-          //             height: 20.0,
-          //           ),
-          //           Padding(
-          //             padding: const EdgeInsets.only(left: 8.0),
-          //             child: Text(
-          //               'Add to Stream Archive',
-          //               style: TextStyle(
-          //                   fontSize: 18.0,
-          //                   fontWeight: FontWeight.w600,
-          //                   color: Colors.grey),
-          //             ),
-          //           ),
-          //          Expanded(child: ListView(
-          //            children: [
-          //              ListTile(
-          //                leading: Icon(Icons.camera_alt),
-          //                title: Text('Take a photo'),
-          //
-          //                onTap: () {
-          //                  // Handle tap for Item 1
-          //                  print('Item 1 tapped');
-          //                },
-          //              ),
-          //              ListTile(
-          //                leading: Icon(Icons.file_copy),
-          //                title: Text('Upload a file'),
-          //
-          //                onTap: () {
-          //                  // Handle tap for Item 2
-          //                  print('Item 2 tapped');
-          //                },
-          //              ),
-          //              ListTile(
-          //                leading: Icon(Icons.document_scanner_outlined),
-          //                title: Text('Scan document'),
-          //
-          //                onTap: () {
-          //                  // Handle tap for Item 3
-          //                  print('Item 3 tapped');
-          //                },
-          //              ),
-          //            ],
-          //          ),),
-          //
-          //         ],
-          //       ),
-          //     );
-          //   },
-          // );
-
           _openFilePicker();
         },
         child: Icon(Icons.add, color: Colors.white),
         backgroundColor: Colors.deepOrange,
-      ),
+      )
+          : null,
+
     );
   }
 
 //Load user data from here
   Future<void> _loadUserData() async {
-    userData = await UserDataManager.loadUserData();
+    Map<String, dynamic> data = await getUserSession();
+    setState(() {
+      userData = data;
+    });
   }
 
+  Future<Map<String, dynamic>> getUserSession() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return {
+      'loggedIn': prefs.getBool('loggedIn') ?? false,
+      'firstName': prefs.getString('firstName') ?? '',
+      'lastName': prefs.getString('lastName') ?? '',
+      'email': prefs.getString('email') ?? '',
+      'designationName': prefs.getString('designationName') ?? '',
+      'userId': prefs.getInt('userId') ?? 0,
+      'organizationid': prefs.getInt('organizationid') ?? 0,
+      'isCommunicationDownload': prefs.getBool('isCommunicationDownload') ?? false,
+      'userProfile': prefs.getString('userProfile') ?? '',
+      'password': prefs.getString('password') ?? '',
+      'employeeCode': prefs.getString('employeeCode') ?? '',
+    };
+  }
   //Api call function here
-  Future<void> fetchDocuments({bool isRefresh = false}) async {
+  Future<void> fetchDocuments(   {required int cabinetId ,bool isRefresh = false}) async {
     if (isLoading) return; // Prevent multiple fetch calls at the same time
 
     print('Fetching documents...');
@@ -1905,7 +2159,10 @@ class _AllDocListState extends State<AllDocList> {
     }
 
     final url = Uri.parse(
-        "https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/ArchiveDocumentList");
+
+        "${ApiUrls.baseUrl}ArchiveAPI/ArchiveDocumentList"
+
+    );
     final Map<String, dynamic> body = {
       "subcatid": "",
       "DocumentTypeIds": "",
@@ -1919,7 +2176,8 @@ class _AllDocListState extends State<AllDocList> {
       "StartDate": "",
       "EndDate": "",
       "DocumentStatus": "",
-      "IsAll": true
+      "IsAll": true,
+      "CabinetId" : cabinetId,
     };
 
     try {
@@ -1935,8 +2193,13 @@ class _AllDocListState extends State<AllDocList> {
         if (responseData["Status"] == true && responseData["Data"] != null) {
           final List<dynamic> jsonList =
               responseData["Data"]["ArchiveJson"] ?? [];
+
           final List<dynamic> jsonPinList =
               responseData["Data"]["PinJson"] ?? [];
+
+          final int totalCount =
+              responseData["Data"]["TotalRecordsJSON"] ?? 0;
+          print("totalCount " + totalCount.toString());
 
           setState(() {
             if (isRefresh) {
@@ -1947,6 +2210,8 @@ class _AllDocListState extends State<AllDocList> {
               pinDocuments = jsonPinList
                   .map((json) => ArchivePinDocument.fromJson(json))
                   .toList();
+
+              totalDocCount = totalCount;
             } else {
               // If it's loading more, append to the existing list
               documents.addAll(jsonList
@@ -1956,7 +2221,7 @@ class _AllDocListState extends State<AllDocList> {
           });
 
           print("Documents loaded: ${documents.length}");
-
+          print("Total count :  ${totalCount.toString()}");
           // Increment the page number for next load more call
           if (!isRefresh) {
             currentPage++;
@@ -1986,9 +2251,42 @@ class _AllDocListState extends State<AllDocList> {
     }
   }
 
-  Future<void> fetchFavoriteDocuments() async {
-    final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/Gac/ArchiveFavoriteList_V2');
+  // Future<void> fetchFavoriteDocuments() async {
+  //   final url = Uri.parse(
+  //       '${ApiUrls.baseUrl}Gac/ArchiveFavoriteList_V2');
+  //   final headers = {"Content-Type": "application/json"};
+  //   final body = jsonEncode({
+  //     "CreatedBy": userData['userId'],
+  //     "Organizationid": userData['organizationid'],
+  //   });
+  //
+  //   try {
+  //     final response = await http.post(url, headers: headers, body: body);
+  //
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       if (data["Status"] == true) {
+  //         List<dynamic> jsonList = data["Data"]["FavoriteJson"];
+  //         setState(() {
+  //           favoriteDocuments = jsonList
+  //               .map((json) => FavoriteDocument.fromJson(json))
+  //               .toList();
+  //           isLoading = false;
+  //         });
+  //       } else {
+  //         showError("No data available");
+  //       }
+  //     } else {
+  //       showError("Failed to load data");
+  //     }
+  //   } catch (e) {
+  //     showError("Error: $e");
+  //   }
+  // }
+  Future<void> fetchFavoriteDocuments({String query = ''}) async {
+   // print("Fetching favorites with search query: '$query' and reverseOrder: $reverseOrder");
+
+    final url = Uri.parse('${ApiUrls.baseUrl}Gac/ArchiveFavoriteList_V2');
     final headers = {"Content-Type": "application/json"};
     final body = jsonEncode({
       "CreatedBy": userData['userId'],
@@ -2002,10 +2300,28 @@ class _AllDocListState extends State<AllDocList> {
         final data = jsonDecode(response.body);
         if (data["Status"] == true) {
           List<dynamic> jsonList = data["Data"]["FavoriteJson"];
+
+          List<FavoriteDocument> documents = jsonList
+              .map((json) => FavoriteDocument.fromJson(json))
+              .toList();
+
+          // Apply search filter if query is provided
+          if (query.isNotEmpty) {
+            final searchLower = query.toLowerCase();
+            documents = documents.where((doc) {
+              final title = doc.documentName?.toLowerCase() ?? '';
+              final desc = doc.description?.toLowerCase() ?? '';
+              return title.contains(searchLower) || desc.contains(searchLower);
+            }).toList();
+          }
+
+          // Reverse if needed
+          // if (reverseOrder) {
+          //   documents = documents.reversed.toList();
+          // }
+
           setState(() {
-            favoriteDocuments = jsonList
-                .map((json) => FavoriteDocument.fromJson(json))
-                .toList();
+            favoriteDocuments = documents;
             isLoading = false;
           });
         } else {
@@ -2029,7 +2345,9 @@ class _AllDocListState extends State<AllDocList> {
 
   Future<void> fetchTrashList() async {
     final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/Gac/ArchiveTrashList_V2');
+        // '${ApiUrls.baseUrl}Gac/ArchiveTrashList_V2'
+    'https://cswebapps.com/dmscoretestapi/api/Gac/ArchiveTrashList_V2'
+    );
     final headers = {"Content-Type": "application/json"};
     final body = jsonEncode({
       "CreatedBy": userData['userId'],
@@ -2060,12 +2378,44 @@ class _AllDocListState extends State<AllDocList> {
     }
   }
 
-  Future<void> fetchShareWithMeList() async {
-    final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/ArchiveShareWithMeList');
+  // Future<void> fetchShareWithMeList() async {
+  //   final url = Uri.parse(
+  //       '${ApiUrls.baseUrl}ArchiveAPI/ArchiveShareWithMeList');
+  //   final headers = {"Content-Type": "application/json"};
+  //   final body = jsonEncode({
+  //     "CreatedBy": 44,
+  //     "Organizationid": userData['organizationid'],
+  //   });
+  //
+  //   try {
+  //     final response = await http.post(url, headers: headers, body: body);
+  //
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       print(data);
+  //       if (data["Status"] == true) {
+  //         List<dynamic> jsonList = data["Data"]["ArchiveJson"];
+  //         setState(() {
+  //           shareWithMeList = jsonList
+  //               .map((json) => ArchiveDocumentShareWithMe.fromJson(json))
+  //               .toList();
+  //           isLoading = false;
+  //         });
+  //       } else {
+  //         showError("No data available");
+  //       }
+  //     } else {
+  //       showError("Failed to load data");
+  //     }
+  //   } catch (e) {
+  //     showError("Error: $e");
+  //   }
+  // }
+  Future<void> fetchShareWithMeList({String query = ''}) async {
+    final url = Uri.parse('${ApiUrls.baseUrl}ArchiveAPI/ArchiveShareWithMeList');
     final headers = {"Content-Type": "application/json"};
     final body = jsonEncode({
-      "CreatedBy": 44,
+      "CreatedBy": userData['userId'], // Consider using: userData['userId'] for consistency
       "Organizationid": userData['organizationid'],
     });
 
@@ -2075,12 +2425,28 @@ class _AllDocListState extends State<AllDocList> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print(data);
+
         if (data["Status"] == true) {
           List<dynamic> jsonList = data["Data"]["ArchiveJson"];
+          List<ArchiveDocumentShareWithMe> docs = jsonList
+              .map((json) => ArchiveDocumentShareWithMe.fromJson(json))
+              .toList();
+
+          // Local search filter
+          if (query.isNotEmpty) {
+            final lowerQuery = query.toLowerCase();
+            docs = docs.where((doc) {
+              final title = doc.documentName?.toLowerCase() ?? '';
+              final desc = doc.description?.toLowerCase() ?? '';
+              return title.contains(lowerQuery) || desc.contains(lowerQuery);
+            }).toList();
+          }
+
+          // Optional reverse
+
+
           setState(() {
-            shareWithMeList = jsonList
-                .map((json) => ArchiveDocumentShareWithMe.fromJson(json))
-                .toList();
+            shareWithMeList = docs;
             isLoading = false;
           });
         } else {
@@ -2094,12 +2460,45 @@ class _AllDocListState extends State<AllDocList> {
     }
   }
 
-  Future<void> fetchShareByMeList() async {
-    final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/ArchiveShareByMeList');
+  // Future<void> fetchShareByMeList() async {
+  //   final url = Uri.parse(
+  //       '${ApiUrls.baseUrl}ArchiveAPI/ArchiveShareByMeList');
+  //   final headers = {"Content-Type": "application/json"};
+  //   final body = jsonEncode({
+  //     "CreatedBy": 44,
+  //     "Organizationid": userData['organizationid'],
+  //   });
+  //
+  //   try {
+  //     final response = await http.post(url, headers: headers, body: body);
+  //
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       print(data);
+  //       if (data["Status"] == true) {
+  //         List<dynamic> jsonList = data["Data"]["ArchiveJson"];
+  //         setState(() {
+  //           shareByMeList = jsonList
+  //               .map((json) => ArchiveDocumentShareByMe.fromJson(json))
+  //               .toList();
+  //           isLoading = false;
+  //         });
+  //       } else {
+  //         showError("No data available");
+  //       }
+  //     } else {
+  //       showError("Failed to load data");
+  //     }
+  //   } catch (e) {
+  //     showError("Error: $e");
+  //   }
+  // }
+
+  Future<void> fetchShareByMeList({String query = ''}) async {
+    final url = Uri.parse('${ApiUrls.baseUrl}ArchiveAPI/ArchiveShareByMeList');
     final headers = {"Content-Type": "application/json"};
     final body = jsonEncode({
-      "CreatedBy": 44,
+      "CreatedBy": userData['userId'], // You can replace 44 with: userData['userId']
       "Organizationid": userData['organizationid'],
     });
 
@@ -2109,12 +2508,28 @@ class _AllDocListState extends State<AllDocList> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         print(data);
+
         if (data["Status"] == true) {
           List<dynamic> jsonList = data["Data"]["ArchiveJson"];
+          List<ArchiveDocumentShareByMe> docs = jsonList
+              .map((json) => ArchiveDocumentShareByMe.fromJson(json))
+              .toList();
+
+          // Local search filtering
+          if (query.isNotEmpty) {
+            final lowerQuery = query.toLowerCase();
+            docs = docs.where((doc) {
+              final title = doc.documentName?.toLowerCase() ?? '';
+              final desc = doc.description?.toLowerCase() ?? '';
+              return title.contains(lowerQuery) || desc.contains(lowerQuery);
+            }).toList();
+          }
+
+          // Optional reverse
+
+
           setState(() {
-            shareByMeList = jsonList
-                .map((json) => ArchiveDocumentShareByMe.fromJson(json))
-                .toList();
+            shareByMeList = docs;
             isLoading = false;
           });
         } else {
@@ -2125,6 +2540,46 @@ class _AllDocListState extends State<AllDocList> {
       }
     } catch (e) {
       showError("Error: $e");
+    }
+  }
+
+  //Click on label and get list of document
+  Future<void> fetchLabelArchives(int labelId) async {
+    final url = Uri.parse(
+        'https://cswebapps.com/dmsapitest/api/LabelsAPI/GetLabelArchives_V2');
+
+    final body = jsonEncode({
+      "LabelId": labelId,
+      "CreatedBy": userData['userId'],
+      "Organizationid": userData['organizationid']
+    });
+
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+
+    try {
+      final response = await http.post(url, body: body, headers: headers);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+print(responseData);
+        if (responseData["Status"] == true && responseData["Data"] != null) {
+          final List<dynamic> jsonList =
+              responseData["Data"]["LabelsArchiveJson"] ?? [];
+          setState(() {
+            documents = jsonList
+                .map((json) => ArchiveDocument.fromJson(json))
+                .toList();
+          });
+        } else {
+          print('API call unsuccessful or Data is null');
+        }
+      } else {
+        print('Failed with status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error occurred: $e');
     }
   }
 
@@ -2132,7 +2587,7 @@ class _AllDocListState extends State<AllDocList> {
 
   Future<void> archiveTrash(int shareId, int documentId) async {
     final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/Gac/ArchiveTrash_V2');
+        '${ApiUrls.baseUrl}Gac/ArchiveTrash_V2');
 
     // JSON data to be sent in the request body
     final Map<String, dynamic> data = {
@@ -2177,7 +2632,7 @@ class _AllDocListState extends State<AllDocList> {
     print(shareId);
     print(isFavorite);
     final url = Uri.parse(
-        'https://cswebapps.com/dmscoretestapi/api/Gac/ArchiveFavorite_V2');
+        '${ApiUrls.baseUrl}Gac/ArchiveFavorite_V2');
     final headers = {'Content-Type': 'application/json'};
 
     final body = jsonEncode({
@@ -2190,6 +2645,8 @@ class _AllDocListState extends State<AllDocList> {
       final response = await http.post(url, headers: headers, body: body);
 
       if (response.statusCode == 200) {
+
+        print("here resultant print " +  isFavorite.toString());
         // Handle success
         print('Request successful');
       } else {
@@ -2414,7 +2871,7 @@ class _AllDocListState extends State<AllDocList> {
   // Future<void> _uploadFile(File file) async {
   //   print("\n🚀 Starting file upload...");
   //
-  //   var url = 'https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/NewDocument';
+  //   var url = '${ApiUrls.baseUrl}ArchiveAPI/NewDocument';
   //   var request = http.MultipartRequest('POST', Uri.parse(url));
   //
   //   try {
@@ -2505,7 +2962,7 @@ class _AllDocListState extends State<AllDocList> {
             .millisecondsSinceEpoch > _expiryTime) {
       try {
         final response = await http.post(Uri.parse(
-            'https://cswebapps.com/dmscoretestapi/api/FileUploadAPI/NewGenerateSASToken'));
+            '${ApiUrls.baseUrl}FileUploadAPI/NewGenerateSASToken'));
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           _sasToken = data['sasToken'];
@@ -2782,7 +3239,7 @@ class _AllDocListState extends State<AllDocList> {
 
       print("\n🚀 Starting file upload...");
 
-      var url = 'https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/NewDocument';
+      var url = '${ApiUrls.baseUrl}ArchiveAPI/NewDocument';
 
 
       try {
@@ -2804,11 +3261,15 @@ class _AllDocListState extends State<AllDocList> {
 
         // Prepare JSON payload
         Map<String, dynamic> requestBody = {
+
+          "documentId" :0,
+          "message":"",
+          "CabinetId" :cabinetId,
           "FlagId": 0,
           "DocumentName": file.path
               .split('/')
               .last,
-          "CreatedBy": 31,
+          "CreatedBy": userData['userId'],
           "FileName": file.path
               .split('/')
               .last,
@@ -2875,7 +3336,7 @@ class _AllDocListState extends State<AllDocList> {
             ),
           );
           // _selectedFiles.clear();
-          await fetchDocuments(isRefresh: true);
+          await fetchDocuments(isRefresh: true, cabinetId: cabinetId);
 
 
           print("\n✅ File uploaded successfully.");
@@ -3415,7 +3876,7 @@ class _AllDocListState extends State<AllDocList> {
   //       var request = http.MultipartRequest(
   //         'POST',
   //         Uri.parse(
-  //             'https://cswebapps.com/dmscoretestapi/api/ArchiveAPI/NewDocument'),
+  //             '${ApiUrls.baseUrl}ArchiveAPI/NewDocument'),
   //       );
   //
   //       print('Uploading file ${i + 1}/${_selectedFiles.length}: ${_selectedFiles[i].path}');
@@ -3490,10 +3951,154 @@ class _AllDocListState extends State<AllDocList> {
   // }
 
   String getShortenedText(String text) {
-    if (text.length > 35) {
-      return text.substring(0, 30) + '...';
+    if (text.length > 25) {
+      return text.substring(0, 10) + '...'; // Keeping more text before truncation
     } else {
       return text;
     }
+  }
+
+
+
+  void fetchCabinetData() async {
+    final url = Uri.parse("https://cswebapps.com/dmsapitest/api/ArchiveAPI/NewGetAssignedCabinet");
+    final response = await http.post(
+      url,
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"CreatedBy": 31}),
+    );
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      final List<dynamic> cabinetJson = body["Data"]["CabinetJson"];
+
+      setState(() {
+        cabinets = cabinetJson.map((e) => Cabinet.fromJson(e)).toList();
+        isLoading = false;
+      });
+    } else {
+      // handle error
+      setState(() {
+        isLoading = false;
+      });
+      print("Error: ${response.statusCode}");
+    }
+  }
+
+  Future<void> fetchLabels() async {
+    print("3");
+    final url =
+        '${ApiUrls.baseUrl}LabelsAPI/GetLabelsMaster';
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        body: json.encode({'UserId': userData['userId']}),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> labelsJson = data['Data']['LablesJson'];
+        print('call labels');
+
+        setState(() {
+          labels = labelsJson.map((label) => Label.fromJson(label)).toList();
+          isLoading = false; // Data is loaded, stop showing loading spinner
+        });
+      } else {
+        print("API request failed with status code:${response.statusCode}");
+        setState(() {
+
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+
+      setState(() {
+
+        isLoading = false;
+      });
+    }
+  }
+
+}
+
+Widget _getFileIconForActivity(String fileName) {
+  if (fileName.endsWith('.doc')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/DOC.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.pdf')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/PDF.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.docx')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/DOCX.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.xsl') || fileName.endsWith('.xlsx')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/XSL.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.jpg')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/JPG.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.ai')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/AI.svg', width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.avi')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/AVI.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.mp3')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/MP3.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.mp4')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/MP4.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.ppt') || fileName.endsWith('.pptx')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/PPT.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.ps')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/PS.svg', width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else if (fileName.endsWith('.png')) {
+    return SvgPicture.asset(
+      'assets/svg_icons/PNG.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
+  } else {
+    return SvgPicture.asset(
+      'assets/svg_icons/DOC.svg',
+      width: 20, // Size equivalent to the original
+      height: 20,
+    );
   }
 }

@@ -24,6 +24,7 @@ class FavoriteDocument {
   final String createdDate;
   final String versionName;
   final String userName;
+  final int sharedId;
 
   FavoriteDocument({
     required this.documentId,
@@ -51,6 +52,7 @@ class FavoriteDocument {
     required this.createdDate,
     required this.versionName,
     required this.userName,
+    required this.sharedId,
   });
 
   factory FavoriteDocument.fromJson(Map<String, dynamic> json) {
@@ -80,6 +82,7 @@ class FavoriteDocument {
       createdDate: json["CreatedDate"] ?? "",
       versionName: json["VersionName"] ?? "",
       userName: json["UserName"] ?? "",
+      sharedId: json['ShareId'] ?? 0
     );
   }
 }
