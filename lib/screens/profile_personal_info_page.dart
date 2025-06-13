@@ -141,7 +141,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
         //     'Personal Information',
         //     style: TextStyle(color: Colors.white),
         //   ),
-        //   backgroundColor: Colors.blue[800],
+        //   backgroundColor: Colors.deepOrange[800],
         //   iconTheme: IconThemeData(color: Colors.white),
         // ),
         body: FutureBuilder<List<UserDetail>>(
@@ -150,7 +150,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
                 child: LoadingAnimationWidget.inkDrop(
-                  color: Colors.blue,
+                  color: Colors.deepOrange,
                   size: 35,
                 ),
               );
@@ -293,12 +293,12 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols.verified_user, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -324,12 +324,12 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols.work_outline, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -355,12 +355,12 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols.email, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -386,12 +386,12 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols.phone_in_talk, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -417,12 +417,12 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols.location_on, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -506,13 +506,13 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     Container(
                                       padding: EdgeInsets.all(6), // Add padding around the icon
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50, // Light blue color for the background
+                                        color: Colors.deepOrange.shade50, // Light deepOrange color for the background
                                         shape: BoxShape.circle, // Circular shape
                                       ),
                                       child: Icon(
                                         Symbols
                                             .supervisor_account, // The icon you want to use
-                                        color: Colors.blue, // Color of the icon itself
+                                        color: Colors.deepOrange, // Color of the icon itself
                                         size: 18.0,
                                       ),
                                     ),
@@ -582,7 +582,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                           Container(
                                             padding: EdgeInsets.all(6), // Add padding around the icon
                                             decoration: BoxDecoration(
-                                              color: Colors.blue, // Light blue color for the background
+                                              color: Colors.deepOrange, // Light deepOrange color for the background
                                               shape: BoxShape.circle, // Circular shape
                                             ),
                                             child: Icon(
@@ -615,9 +615,82 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                   ),
                                 ),
                                 SizedBox(height: 15.0,),
+                                // GestureDetector(
+                                //   onTap: (){
+                                //     _openFilePickerForSignature(context);
+                                //   },
+                                //   child:  Row(
+                                //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                //     children: [
+                                //       Row(
+                                //         children: [
+                                //           Container(
+                                //             padding: EdgeInsets.all(6), // Add padding around the icon
+                                //             decoration: BoxDecoration(
+                                //               color: Colors.deepOrange, // Light deepOrange color for the background
+                                //               shape: BoxShape.circle, // Circular shape
+                                //             ),
+                                //             child: Icon(
+                                //               Symbols.ink_pen, // The icon you want to use
+                                //               color: Colors.white, // Color of the icon itself
+                                //               size: 18.0,
+                                //             ),
+                                //           ),
+                                //           SizedBox(width: 5.0,),
+                                //
+                                //           Wrap(
+                                //             direction: Axis.vertical,
+                                //             children: [
+                                //               Text("Add Signature", style: TextStyle(color: Colors.black, fontSize: 14.0 , fontWeight: FontWeight.w600)),
+                                //               // Text("Update and strengthen account security" ,
+                                //               //     style: TextStyle(fontSize: 12.0, color: Colors.grey),
+                                //               //     overflow: TextOverflow.ellipsis),
+                                //             ],
+                                //           ),
+                                //
+                                //
+                                //
+                                //         ],
+                                //       ),
+                                //       Padding(
+                                //         padding: const EdgeInsets.only(right: 8.0),
+                                //         child: Icon(Symbols.arrow_circle_right , color: Colors.grey,),
+                                //       ),
+                                //     ],
+                                //   ),
+                                // ),
+                                // Padding(
+                                //   padding: const EdgeInsets.all(8.0),
+                                //   child: Row(
+                                //     mainAxisAlignment: MainAxisAlignment.start, // Aligns children to the right
+                                //     children: [
+                                //       (userDetail.signature.isNotEmpty && userDetail.signature != "NA")
+                                //           ? ClipRect(
+                                //         child: Align(
+                                //           alignment: Alignment.center,
+                                //           child: Image.network(
+                                //             "https://yrglobaldocuments.blob.core.windows.net/documents/" + userDetail.signature,
+                                //             fit: BoxFit.contain,
+                                //             width: 150,
+                                //             height: 40,
+                                //             errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
+                                //               // Shrinks the widget if image is not available
+                                //               return SizedBox.shrink();
+                                //             },
+                                //           ),
+                                //         ),
+                                //       )
+                                //           : SizedBox.shrink(),
+                                //     ],
+                                //   ),
+                                // ),
                                 GestureDetector(
                                   onTap: (){
-                                    _openFilePickerForSignature(context);
+                                    // Navigator.push(
+                                    //   context,
+                                    //   MaterialPageRoute(builder: (context) => PrivacyPolicy()),
+                                    // );
+
                                   },
                                   child:  Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -626,22 +699,22 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                         children: [
                                           Container(
                                             padding: EdgeInsets.all(6), // Add padding around the icon
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue, // Light blue color for the background
+                                            decoration: const BoxDecoration(
+                                              color: Colors.deepOrange, // Light blue color for the background
                                               shape: BoxShape.circle, // Circular shape
                                             ),
-                                            child: Icon(
-                                              Symbols.ink_pen, // The icon you want to use
+                                            child: const Icon(
+                                              Icons.privacy_tip_outlined, // The icon you want to use
                                               color: Colors.white, // Color of the icon itself
                                               size: 18.0,
                                             ),
                                           ),
-                                          SizedBox(width: 5.0,),
+                                          const SizedBox(width: 5.0,),
 
-                                          Wrap(
+                                          const Wrap(
                                             direction: Axis.vertical,
                                             children: [
-                                              Text("Add Signature", style: TextStyle(color: Colors.black, fontSize: 14.0 , fontWeight: FontWeight.w600)),
+                                              Text("Privacy Policy", style: TextStyle(color: Colors.black, fontSize: 14.0 , fontWeight: FontWeight.w600)),
                                               // Text("Update and strengthen account security" ,
                                               //     style: TextStyle(fontSize: 12.0, color: Colors.grey),
                                               //     overflow: TextOverflow.ellipsis),
@@ -659,31 +732,8 @@ class _PersonalInformationState extends State<PersonalInformation> {
                                     ],
                                   ),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start, // Aligns children to the right
-                                    children: [
-                                      (userDetail.signature.isNotEmpty && userDetail.signature != "NA")
-                                          ? ClipRect(
-                                        child: Align(
-                                          alignment: Alignment.center,
-                                          child: Image.network(
-                                            "https://yrglobaldocuments.blob.core.windows.net/documents/" + userDetail.signature,
-                                            fit: BoxFit.contain,
-                                            width: 150,
-                                            height: 40,
-                                            errorBuilder: (BuildContext context, Object exception, StackTrace? stackTrace) {
-                                              // Shrinks the widget if image is not available
-                                              return SizedBox.shrink();
-                                            },
-                                          ),
-                                        ),
-                                      )
-                                          : SizedBox.shrink(),
-                                    ],
-                                  ),
-                                ),
+
+
                               ],
                             ),
                           ),
@@ -726,7 +776,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
                       Container(
                         padding: EdgeInsets.all(6), // Add padding around the icon
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300, // Light blue color for the background
+                          color: Colors.grey.shade300, // Light deepOrange color for the background
                           shape: BoxShape.circle, // Circular shape
                         ),
                         child: Icon(
@@ -933,7 +983,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
                         _signatureController.clear();
                       },
                       style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.blue.shade800, // Text color
+                          foregroundColor: Colors.deepOrange.shade800, // Text color
                           side: const BorderSide(
                               color: Colors.grey, width: 1), // Border color and width
                           shape: RoundedRectangleBorder(
@@ -994,7 +1044,7 @@ class _PersonalInformationState extends State<PersonalInformation> {
                         }
                       },
                       style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade800, // Set button background color to white
+                          backgroundColor: Colors.deepOrange.shade800, // Set button background color to white
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8.0), // Optional: Set rounded corners
                           ),

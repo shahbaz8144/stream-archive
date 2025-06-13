@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'dart:typed_data';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' as ex;
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:get/get.dart';
@@ -25,6 +25,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:stream_archive/models/archive_favorite_model.dart';
 import 'package:stream_archive/screens/doc_details.dart';
 import 'package:stream_archive/screens/profile_personal_info_page.dart';
+import 'package:toggle_switch/toggle_switch.dart';
 import 'package:xml/xml.dart';
 import '../data/user_data_manager.dart';
 import 'package:http/http.dart' as http;
@@ -37,6 +38,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart' as sf; // Alias for Syncfusion 
 import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
@@ -53,6 +55,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart' as pdfx;
 import 'package:pdf/pdf.dart' as pdf;
 
+import '../design/drop_down.dart';
+import '../design/myicons.dart';
 import '../models/all_labels_model.dart';
 import '../models/archive_inbox_model.dart';
 import '../models/archive_pin_model.dart';
@@ -84,7 +88,7 @@ class _AllDocListState extends State<AllDocList> {
   List<dynamic> pinDocuments = [];
   List<Cabinet> cabinets = [];
   List<Label> labels = [];
-  bool isLoading = false;
+  bool isLoading = true;
   bool showList = false;
   RefreshController _refreshControllerForMainArchiveList =
   RefreshController(initialRefresh: false);
@@ -129,6 +133,7 @@ class _AllDocListState extends State<AllDocList> {
   final TextRecognizer _textRecognizer = TextRecognizer();
   bool _showSearchBar = false;
   String _searchQuery = "";
+  String? appbarTitle = "All Documents";
 
   Future<void> _pickAndProcessFile(StateSetter setModalState) async {
     debugPrint('Starting file picker...');
@@ -423,27 +428,19 @@ class _AllDocListState extends State<AllDocList> {
 
       Column(
         children: [
-          // Row(
-          //   mainAxisAlignment: MainAxisAlignment.end,
-          //   children: [
-          //     Padding(
-          //       padding: const EdgeInsets.only(right: 8.0),
-          //       child: GestureDetector(
-          //         onTap: () {
-          //           setState(() {
-          //             showList = !showList;
-          //           });
-          //         },
-          //         child: Icon(showList ? Icons.grid_on : Icons.list),
-          //       ),
-          //     ),
-          //   ],
-          // ),
-          // showList
-          //     ?
+
           Expanded(
               child: SlidableAutoCloseBehavior(
-                  child: SmartRefresher(
+                  child:
+                  isLoading
+                      ? Center(child:LoadingAnimationWidget.inkDrop(
+                    color: Colors.deepOrange,
+                    size: 35,
+                  ),)
+                      : documents.isEmpty
+                      ? Center(child: Text("No documents found"))
+                      :
+                      SmartRefresher(
                   controller: _refreshControllerForMainArchiveList,
                   onRefresh: () async {
 
@@ -493,7 +490,7 @@ class _AllDocListState extends State<AllDocList> {
                                       ? Icons.push_pin
                                       : Icons
                                       .push_pin, // Conditional icon
-                                  color: doc.isPin == true ?  Colors.blue : Colors.black,
+                                  color: doc.isPin == true ?  Colors.deepOrange : Colors.black,
                                   // Icon color
                                   size: 20,
                                 )
@@ -586,7 +583,7 @@ class _AllDocListState extends State<AllDocList> {
                                     fontSize: 12.0,
                                     fontWeight: FontWeight.w600,
                                     color:
-                                    doc.isRead ? Colors.black : Colors.blue,
+                                    doc.isRead ? Colors.black : Colors.deepOrange,
                                   ),
                                 ),
                                 subtitle: Column(
@@ -599,7 +596,7 @@ class _AllDocListState extends State<AllDocList> {
                                         fontSize: 11,
                                         color: doc.isRead
                                             ? Colors.black
-                                            : Colors.blue,
+                                            : Colors.deepOrange,
                                       ),
                                     ),
                                     Text(
@@ -608,7 +605,7 @@ class _AllDocListState extends State<AllDocList> {
                                         fontSize: 9,
                                         color: doc.isRead
                                             ? Colors.grey
-                                            : Colors.blue,
+                                            : Colors.deepOrange,
                                       ),
                                     ),
                                   ],
@@ -619,13 +616,13 @@ class _AllDocListState extends State<AllDocList> {
                                     // Show version only if versionName is not null or empty
                                     if (doc.versionName.isNotEmpty)
                                       Container(
-                                        color: Colors.grey[200],
+                                        color: Colors.deepOrange[50],
                                         padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                         child: Text(
                                           "Version ${doc.versionName}",
                                           style: TextStyle(
                                             fontSize: 8,
-                                            color: doc.isRead ? Colors.black : Colors.blue,
+                                            color: doc.isRead ? Colors.black : Colors.deepOrange,
                                           ),
                                         ),
                                       ),
@@ -637,7 +634,7 @@ class _AllDocListState extends State<AllDocList> {
                                         doc.createdDateString.toString(),
                                         style: TextStyle(
                                           fontSize: 8,
-                                          color: doc.isRead ? Colors.black : Colors.blue,
+                                          color: doc.isRead ? Colors.black : Colors.deepOrange,
                                         ),
                                       ),
 
@@ -655,7 +652,7 @@ class _AllDocListState extends State<AllDocList> {
                                 //       Icon(
                                 //         Icons.push_pin_sharp,
                                 //         size: 15,
-                                //         color: Colors.blue,
+                                //         color: Colors.deepOrange,
                                 //       ),
                                 //     if (doc.isFavorite)
                                 //       Icon(
@@ -829,228 +826,7 @@ class _AllDocListState extends State<AllDocList> {
                     },
                   )))
           )
-              // :
-          // Expanded(
-          //     child: SmartRefresher(
-          //         controller: _refreshControllerForMainArchiveList,
-          //         onRefresh: () async {
-          //           // Reset the page and fetch again
-          //           await fetchDocuments(isRefresh: true);
-          //           _refreshControllerForMainArchiveList.refreshCompleted();
-          //         },
-          //         enablePullUp: true,
-          //         enablePullDown: true,
-          //         onLoading: () async {
-          //           print('working');
-          //           // Load more documents
-          //           await fetchDocuments(isRefresh: false);
-          //         },
-          //         child:GridView.builder(
-          //           itemCount: pinDocuments.length + documents.length,
-          //           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          //             crossAxisCount: 2,
-          //             crossAxisSpacing: 8.0,
-          //             mainAxisSpacing: 0.0, // No vertical spacing between grid items
-          //             childAspectRatio: 1.25,
-          //           ),
-          //           itemBuilder: (context, index) {
-          //             final isPinDocument = index < pinDocuments.length;
-          //             final doc = isPinDocument
-          //                 ? pinDocuments[index]
-          //                 : documents[index - pinDocuments.length];
-          //
-          //             return Card(
-          //               elevation: 4.0,
-          //               margin: EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 0.0), // No bottom margin
-          //               child: InkWell(
-          //                 onTap: () {
-          //                   Navigator.push(
-          //                     context,
-          //                     MaterialPageRoute(builder: (context) => DocDetails(
-          //                       documentId : doc.documentId.toString(),
-          //                       referenceId: '0',
-          //                       shareId: doc.shareId.toString(),
-          //                       createdBy: userData['userId'].toString(),
-          //                       organizationId: userData['organizationid'].toString() ,
-          //                       documentName:doc.documentName
-          //
-          //                     )),
-          //                   );
-          //                 },
-          //                 child: Column(
-          //                   crossAxisAlignment: CrossAxisAlignment.start,
-          //                   mainAxisAlignment: MainAxisAlignment.spaceBetween, // Push content to top and bottom
-          //                   children: [
-          //                     Row(
-          //                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //                       children: [
-          //                         Flexible(
-          //                           child: Row(
-          //                             children: [
-          //                               _getFileIconForActivity(doc.documentName),
-          //                               SizedBox(width: 5.0),
-          //                               Flexible(
-          //                                 child: Text(
-          //                                   getShortenedText(doc.documentName),
-          //                                   style: TextStyle(
-          //                                     fontSize: 12.0,
-          //                                     fontWeight: FontWeight.w600,
-          //                                   ),
-          //                                   overflow: TextOverflow.ellipsis,
-          //                                 ),
-          //                               ),
-          //                             ],
-          //                           ),
-          //                         ),
-          //                         IconButton(
-          //                           icon: Icon(
-          //                             Icons.more_vert_outlined,
-          //                             size: 20.0,
-          //                             color: Colors.grey,
-          //                           ),
-          //                           onPressed: () {
-          //                             showModalBottomSheet(
-          //                               context: context,
-          //                               builder: (BuildContext context) {
-          //                                 return Container(
-          //                                   height: 450,
-          //                                   width: double.infinity,
-          //                                   color: Colors.white,
-          //                                   child: Padding(
-          //                                     padding: const EdgeInsets.only(top: 20.0),
-          //                                     child: Column(
-          //                                       children: [
-          //                                         Container(
-          //                                           height: 5,
-          //                                           width: 60,
-          //                                           decoration: BoxDecoration(
-          //                                             color: Colors.grey.shade300,
-          //                                             borderRadius: BorderRadius.circular(8),
-          //                                           ),
-          //                                         ),
-          //                                         SizedBox(height: 20.0),
-          //                                         // Container(
-          //                                         //   width: 80,
-          //                                         //   height: 100,
-          //                                         //
-          //                                         //   child: ClipRRect(
-          //                                         //     borderRadius: BorderRadius.circular(5.0),
-          //                                         //     child: Image.network(
-          //                                         //       doc.url,
-          //                                         //       fit: BoxFit.cover,
-          //                                         //     ),
-          //                                         //   ),
-          //                                         // ),
-          //                                         Container(
-          //                                           width: 100,
-          //                                           height: 100, // Adjust to 80 if desired
-          //                                           alignment: Alignment.bottomCenter,
-          //
-          //                                           child: ClipRRect(
-          //                                             borderRadius: BorderRadius.circular(5.0),
-          //                                             child: Image.network(
-          //                                               doc.url,
-          //                                               fit: BoxFit.cover,
-          //                                             ),
-          //                                           ),
-          //                                         ),
-          //                                         SizedBox(height: 20.0),
-          //                                         Text(
-          //                                           DateFormat('MMMM dd, yyyy, hh:mm:ss a')
-          //                                               .format(DateTime.parse(doc.createdDateWithTime)),
-          //                                           style: TextStyle(fontSize: 12.0),
-          //                                         ),
-          //                                         SizedBox(height: 10.0),
-          //                                         Container(
-          //                                           height: 0.15,
-          //                                           color: Colors.grey,
-          //                                         ),
-          //                                         Expanded(
-          //                                           child: ListView(
-          //                                             children: [
-          //                                               ListTile(
-          //                                                 leading: Icon(Symbols.keep_pin),
-          //                                                 title: Text('Pin'),
-          //                                                 onTap: () {},
-          //                                               ),
-          //                                               ListTile(
-          //                                                 leading: Icon(Icons.star),
-          //                                                 title: Text('Favorite'),
-          //                                                 onTap: () async {
-          //                                                   await archiveFavorite(
-          //                                                       doc.documentId,
-          //                                                       doc.shareId,
-          //                                                       doc.isFavorite);
-          //                                                   setState(() {
-          //                                                     fetchDocuments(isRefresh: true);
-          //                                                   });
-          //                                                   Navigator.pop(context);
-          //                                                 },
-          //                                               ),
-          //                                               ListTile(
-          //                                                 leading: Icon(Icons.mail),
-          //                                                 title: Text('Unread'),
-          //                                                 onTap: () {},
-          //                                               ),
-          //                                               ListTile(
-          //                                                 leading: Icon(Icons.delete),
-          //                                                 title: Text('Delete'),
-          //                                                 onTap: () async {
-          //                                                   await archiveTrash(
-          //                                                       doc.shareId, doc.documentId);
-          //                                                   setState(() {
-          //                                                     fetchDocuments(isRefresh: true);
-          //                                                   });
-          //                                                   Navigator.pop(context);
-          //                                                 },
-          //                                               ),
-          //                                             ],
-          //                                           ),
-          //                                         ),
-          //                                       ],
-          //                                     ),
-          //                                   ),
-          //                                 );
-          //                               },
-          //                             );
-          //                           },
-          //                         ),
-          //                       ],
-          //                     ),
-          //                     Expanded( // Wrap the image Row in Expanded to fill remaining space
-          //                       child: Row(
-          //                         mainAxisAlignment: MainAxisAlignment.center,
-          //                         children: [
-          //                           Container(
-          //                             height: 100, // Fill the available height
-          //                             width: 130,
-          //                             decoration: BoxDecoration(
-          //                               border: material.Border(
-          //                                 left: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
-          //                                 top: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
-          //                                 right: material.BorderSide(color: Colors.indigo.shade50, width: 10.0),
-          //                               ),
-          //                               borderRadius: material.BorderRadius.circular(10.0),
-          //                             ),
-          //                             child: ClipRRect(
-          //                               borderRadius: BorderRadius.zero,
-          //                               child: Image.network(
-          //                                 doc.url,
-          //                                 fit: BoxFit.cover,
-          //                               ),
-          //                             ),
-          //                           ),
-          //                         ],
-          //                       ),
-          //                     ),
-          //                   ],
-          //                 ),
-          //               ),
-          //             );
-          //           },
-          //         )
-          //     )
-          // )
+
         ],
       ),
 
@@ -1098,7 +874,7 @@ class _AllDocListState extends State<AllDocList> {
                           fontSize: 12.0,
                           fontWeight: FontWeight.w600,
                           color:
-                          doc.isRead ? Colors.black : Colors.blue)),
+                          doc.isRead ? Colors.black : Colors.deepOrange)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment
                         .start, // Aligns the text to the left
@@ -1109,14 +885,14 @@ class _AllDocListState extends State<AllDocList> {
                         style: TextStyle(
                             fontSize: 11,
                             color:
-                            doc.isRead ? Colors.black : Colors.blue),
+                            doc.isRead ? Colors.black : Colors.deepOrange),
                       ),
                       Text(
                         getShortenedText(doc.description),
                         style: TextStyle(
                             fontSize: 9,
                             color:
-                            doc.isRead ? Colors.grey : Colors.blue),
+                            doc.isRead ? Colors.grey : Colors.deepOrange),
                       ),
                     ],
                   ),
@@ -1127,13 +903,13 @@ class _AllDocListState extends State<AllDocList> {
                       // Show version only if versionName is not null or empty
                       if (doc.versionName.isNotEmpty)
                         Container(
-                          color: Colors.grey[200],
+                          color: Colors.deepOrange[50],
                           padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           child: Text(
                             "Version ${doc.versionName}",
                             style: TextStyle(
                               fontSize: 8,
-                              color: doc.isRead ? Colors.black : Colors.blue,
+                              color: doc.isRead ? Colors.black : Colors.deepOrange,
                             ),
                           ),
                         ),
@@ -1145,7 +921,7 @@ class _AllDocListState extends State<AllDocList> {
                           doc.createdDateString.toString(),
                           style: TextStyle(
                             fontSize: 8,
-                            color: doc.isRead ? Colors.black : Colors.blue,
+                            color: doc.isRead ? Colors.black : Colors.deepOrange,
                           ),
                         ),
 
@@ -1220,7 +996,7 @@ class _AllDocListState extends State<AllDocList> {
                       style: TextStyle(
                           fontSize: 12.0,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black)),
+                          color : doc.isRead ? Colors.black : Colors.deepOrange)),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment
                         .start, // Aligns the text to the left
@@ -1229,11 +1005,11 @@ class _AllDocListState extends State<AllDocList> {
                       Text(
                         doc.documentName,
                         style:
-                        TextStyle(fontSize: 11, color: Colors.black),
+                        TextStyle(fontSize: 11, color: doc.isRead ? Colors.black : Colors.deepOrange),
                       ),
                       Text(
                         getShortenedText(doc.description),
-                        style: TextStyle(fontSize: 9, color: Colors.grey),
+                        style: TextStyle(fontSize: 9, color: doc.isRead ? Colors.black : Colors.deepOrange),
                       ),
                     ],
                   ),
@@ -1243,13 +1019,13 @@ class _AllDocListState extends State<AllDocList> {
                       // Show version only if versionName is not null or empty
                       if (doc.versionName.isNotEmpty)
                         Container(
-                          color: Colors.grey[200],
+                          color: Colors.deepOrange[50],
                           padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                           child: Text(
                             "Version ${doc.versionName}",
                             style: TextStyle(
                               fontSize: 8,
-                              color: doc.isRead ? Colors.black : Colors.blue,
+                              color: doc.isRead ? Colors.black : Colors.deepOrange,
                             ),
                           ),
                         ),
@@ -1261,7 +1037,7 @@ class _AllDocListState extends State<AllDocList> {
                           doc.createdDateString.toString(),
                           style: TextStyle(
                             fontSize: 8,
-                            color: doc.isRead ? Colors.black : Colors.blue,
+                            color: doc.isRead ? Colors.black : Colors.deepOrange,
                           ),
                         ),
 
@@ -1286,59 +1062,104 @@ class _AllDocListState extends State<AllDocList> {
       //Share options here
       Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      isShareWithMeActive = true;
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0 , right: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isShareWithMeActive ? 'Share With Me' : 'Share By Me',
+                  style: TextStyle(
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                ToggleSwitch(
+                  initialLabelIndex: isShareWithMeActive ? 0 : 1, // Maintain state
+                  customWidths: isShareWithMeActive ? [90.0, 40.0] : [40.0, 120.0], // Swap widths
+                  cornerRadius: 25.0,
+                  radiusStyle: true,
+                  minHeight: 25.0,
+                  activeBgColors: [[Colors.deepOrange], [Colors.deepOrange]],
+                  activeFgColor: Colors.white,
+                  inactiveBgColor: Colors.deepOrange.shade50,
+                  inactiveFgColor: Colors.white,
+                  borderColor: [Colors.deepOrange.shade50], // Border color for entire button
+                  borderWidth: 5.0, // Border thickness
+                  totalSwitches: 2,
+                  labels: isShareWithMeActive ? ['With Me', ''] : ['', 'By Me'], // Swap labels
+                  customTextStyles: const [
+                    TextStyle(fontSize: 12.0),
+                    TextStyle(fontSize: 12.0),
+                  ],
+                  customIcons: [
+                    Icon(Symbols.device_hub, color: isShareWithMeActive ? Colors.white : Colors.grey , size: 16.0,), // Pending
+                    Icon(Symbols.share, color: isShareWithMeActive ? Colors.grey : Colors.white , size: 16.0,), // Completed
+                  ],
+                  onToggle: (index) {
+                    setState(() { // Update state and UI
+                      isShareWithMeActive = index == 0;
+                    });
+                    if (isShareWithMeActive) {
                       fetchShareWithMeList();
-                    });
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    height: 50,
-                    alignment: Alignment.center,
-                    color:
-                    isShareWithMeActive ? Colors.deepOrange : Colors.white,
-                    child: Text(
-                      'Share with me',
-                      style: TextStyle(
-                        color:
-                        isShareWithMeActive ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      isShareWithMeActive = false;
+                    } else {
                       fetchShareByMeList();
-                    });
+                    }
                   },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    alignment: Alignment.center,
-                    height: 50,
-                    color:
-                    !isShareWithMeActive ? Colors.deepOrange : Colors.white,
-                    child: Text(
-                      'Share by me',
-                      style: TextStyle(
-                        color:
-                        !isShareWithMeActive ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ),
-              ),
-            ],
+                // Expanded(
+                //   child: GestureDetector(
+                //     onTap: () {
+                //       setState(() {
+                //         isShareWithMeActive = true;
+                //         fetchShareWithMeList();
+                //       });
+                //     },
+                //     child: Container(
+                //       padding: EdgeInsets.symmetric(vertical: 12),
+                //       height: 50,
+                //       alignment: Alignment.center,
+                //       color:
+                //       isShareWithMeActive ? Colors.deepOrange : Colors.white,
+                //       child: Text(
+                //         'Share with me',
+                //         style: TextStyle(
+                //           color:
+                //           isShareWithMeActive ? Colors.white : Colors.black,
+                //           fontWeight: FontWeight.bold,
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                // Expanded(
+                //   child: GestureDetector(
+                //     onTap: () {
+                //       setState(() {
+                //         isShareWithMeActive = false;
+                //         fetchShareByMeList();
+                //       });
+                //     },
+                //     child: Container(
+                //       padding: EdgeInsets.symmetric(vertical: 12),
+                //       alignment: Alignment.center,
+                //       height: 50,
+                //       color:
+                //       !isShareWithMeActive ? Colors.deepOrange : Colors.white,
+                //       child: Text(
+                //         'Share by me',
+                //         style: TextStyle(
+                //           color:
+                //           !isShareWithMeActive ? Colors.white : Colors.black,
+                //           fontWeight: FontWeight.bold,
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+                // ),
+              ],
+            ),
           ),
           isShareWithMeActive
               ? isLoading
@@ -1383,7 +1204,7 @@ class _AllDocListState extends State<AllDocList> {
                               style: TextStyle(
                                   fontSize: 12.0,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black)),
+                                  color:  doc.isRead ? Colors.black : Colors.deepOrange)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment
                                 .start, // Aligns the text to the left
@@ -1392,7 +1213,7 @@ class _AllDocListState extends State<AllDocList> {
                               Text(
                                 doc.documentName,
                                 style: TextStyle(
-                                    fontSize: 11, color: Colors.black),
+                                    fontSize: 11, color:  doc.isRead ? Colors.black : Colors.deepOrange),
                               ),
 
                               // Text(
@@ -1408,13 +1229,13 @@ class _AllDocListState extends State<AllDocList> {
                               // Show version only if versionName is not null or empty
                               if (doc.versionName.isNotEmpty)
                                 Container(
-                                  color: Colors.grey[200],
+                                  color: Colors.deepOrange[50],
                                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                   child: Text(
                                     "Version ${doc.versionName}",
                                     style: TextStyle(
                                       fontSize: 8,
-                                      color: doc.isRead ? Colors.black : Colors.blue,
+                                      color: doc.isRead ? Colors.black : Colors.deepOrange,
                                     ),
                                   ),
                                 ),
@@ -1426,7 +1247,7 @@ class _AllDocListState extends State<AllDocList> {
                                   doc.createdDateString.toString(),
                                   style: TextStyle(
                                     fontSize: 8,
-                                    color: doc.isRead ? Colors.black : Colors.blue,
+                                    color: doc.isRead ? Colors.black : Colors.deepOrange,
                                   ),
                                 ),
 
@@ -1490,7 +1311,7 @@ class _AllDocListState extends State<AllDocList> {
                               style: TextStyle(
                                   fontSize: 12.0,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.black)),
+                                  color:  doc.isRead ? Colors.black : Colors.deepOrange)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment
                                 .start, // Aligns the text to the left
@@ -1499,7 +1320,7 @@ class _AllDocListState extends State<AllDocList> {
                               Text(
                                 doc.documentName,
                                 style: TextStyle(
-                                    fontSize: 11, color: Colors.black),
+                                    fontSize: 11, color:  doc.isRead ? Colors.black : Colors.deepOrange),
                               ),
                               // Text(
                               //   getShortenedText(doc.description),
@@ -1514,13 +1335,13 @@ class _AllDocListState extends State<AllDocList> {
                               // Show version only if versionName is not null or empty
                               if (doc.versionName.isNotEmpty)
                                 Container(
-                                  color: Colors.grey[200],
+                                  color: Colors.deepOrange[50],
                                   padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                   child: Text(
                                     "Version ${doc.versionName}",
                                     style: TextStyle(
                                       fontSize: 8,
-                                      color: doc.isRead ? Colors.black : Colors.blue,
+                                      color: doc.isRead ? Colors.black : Colors.deepOrange,
                                     ),
                                   ),
                                 ),
@@ -1532,7 +1353,7 @@ class _AllDocListState extends State<AllDocList> {
                                   doc.createdDateString.toString(),
                                   style: TextStyle(
                                     fontSize: 8,
-                                    color: doc.isRead ? Colors.black : Colors.blue,
+                                    color: doc.isRead ? Colors.black : Colors.deepOrange,
                                   ),
                                 ),
 
@@ -1565,16 +1386,28 @@ class _AllDocListState extends State<AllDocList> {
 
     if (index == 0) {
       fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+      setState(() {
+        appbarTitle = 'All Documents';
+      });
     } else if (index == 1) {
       _isLoading = true;
       fetchFavoriteDocuments();
+      setState(() {
+        appbarTitle = 'Favorite';
+      });
     } else if (index == 2) {
       _isLoading = true;
       fetchTrashList();
+      setState(() {
+        appbarTitle = 'Trash';
+      });
     } else if (index == 3) {
       _isLoading = true;
       isShareWithMeActive = true;
       fetchShareWithMeList();
+      setState(() {
+        appbarTitle = 'Share';
+      });
     }
   }
 
@@ -1634,7 +1467,16 @@ class _AllDocListState extends State<AllDocList> {
             ),
           ],
         ),
-        title: const Text('Stream Archive'),
+        title: Padding(
+          padding: const EdgeInsets.only(left: 35.0),
+          child: Center(child:Text(appbarTitle ?? '',
+          style: TextStyle(
+            fontSize: 20.0,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          )),
+        ),
+        ),
         actions: [
 
 
@@ -1642,34 +1484,19 @@ class _AllDocListState extends State<AllDocList> {
               onPressed: () {
                 // Ensure _activeTile is not null or empty
                 if (_selectedIndex == 0) {
-                  //_handleSearch(context); // Call search if it's get the data for option in search
-                  //   _showBottomSheet(context);
-                  showModalBottomSheet(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return Container(
-                        padding: EdgeInsets.all(16),
-                        height: 250,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Search',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 16),
-                            TextField(
-                              decoration: InputDecoration(
-                                hintText: 'Type to search...',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            // Add more widgets if needed
-                          ],
-                        ),
-                      );
-                    },
-                  );
+                  // _handleSearch(context);
+                  setState(() {
+                    _showSearchBar = !_showSearchBar;
+
+                    // If the search bar is hidden, clear the search field and reload favorite memos
+                    if (!_showSearchBar) {
+                      searchController.clear(); // Clear the TextField input
+                      // _loadFavoriteMemos(
+                      //     isRefresh: true); // Reload favorite memos
+                    }
+                  });
+
+
                 } else {
                   // Toggle search bar visibility
                   setState(() {
@@ -1689,7 +1516,7 @@ class _AllDocListState extends State<AllDocList> {
 
                 color: (_selectedIndex == 0)
                     ? Colors
-                    .blue // If conditions are met, set the color to blue
+                    .deepOrange // If conditions are met, set the color to deepOrange
                     : null, // Default color (if not matching conditions)
               )),
 
@@ -1701,13 +1528,9 @@ class _AllDocListState extends State<AllDocList> {
               return IconButton(
                 padding: EdgeInsets.zero,
                 alignment: Alignment.center,
-                iconSize: 20,
-                icon: SvgPicture.asset(
-                  'assets/svg_icons/cabinate_icon.svg',
-                  width: 20,
-                  height: 20,
-                  // You can also specify color here if needed
-                  // color: Colors.white,
+                iconSize: 25,
+                icon:  Icon(
+                  Symbols.sort,
                 ),
                 onPressed: () {
                   Scaffold.of(context).openDrawer();
@@ -1718,10 +1541,16 @@ class _AllDocListState extends State<AllDocList> {
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(
-              _showSearchBar && _selectedIndex != 0 ? 80 : 30),
+              _showSearchBar
+                  // && _selectedIndex != 0
+                  ? 50 : 20
+              // 30
+          ),
           child: Column(
             children: [
-              if (_showSearchBar && _selectedIndex != 0)
+              if (_showSearchBar
+                  // && _selectedIndex != 0
+              )
                 Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 5.0, vertical: 5.0),
@@ -1753,6 +1582,14 @@ class _AllDocListState extends State<AllDocList> {
                             color: Colors.black, fontSize: 14.0),
                         cursorHeight: 22.0,
                         onChanged: (query) {
+                          //Optional this
+                          if (_selectedIndex == 0) {
+                            setState(() {
+                              _searchQuery = query;
+                            });
+                            fetchDocuments(query: _searchQuery, cabinetId: cabinetId);
+                          }
+
                           if (_selectedIndex == 1) {
                             setState(() {
                               _searchQuery = query;
@@ -1801,7 +1638,8 @@ class _AllDocListState extends State<AllDocList> {
           bottomRight: Radius.circular(30.0),
         ),
         child: Drawer(
-          child:Column(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 50.0, left: 15.0),
@@ -1810,74 +1648,49 @@ class _AllDocListState extends State<AllDocList> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => PersonalInformation(
-                              loginUserId: userData['userId'])),
+                        builder: (context) => PersonalInformation(
+                          loginUserId: userData['userId'],
+                        ),
+                      ),
                     );
                   },
                   child: Column(
                     children: [
-                      // Padding(
-                      //   padding: const EdgeInsets.only(left: 8.0),
-                      //   child: Image.asset(
-                      //     'assets/dms-logo.png',
-                      //     width: 40,
-                      //     height: 40,
-                      //   ),
-                      // ),
-                      // const Padding(
-                      //   padding: EdgeInsets.only(),
-                      //   child: Text(
-                      //     'STREAM MAIL',
-                      //     style: TextStyle(
-                      //         color: Colors.black,
-                      //         fontSize: 20,
-                      //         fontWeight: FontWeight.w400,
-                      //         fontFamily: 'AvenirNextCyr-Bold'),
-                      //   ),
-                      // ),
-
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
-                            // border: Border.all(
-                            //   color: Colors.grey, // Border color
-                            //   width: 0.5, // Border width
-                            // ),
                           ),
                           child: CircleAvatar(
                             radius: 28.0,
                             backgroundImage: userData['userProfile'] == null ||
                                 userData['userProfile'] == '' ||
                                 userData['userProfile'] == 'NA'
-                                ? null // No image if the condition is true
+                                ? null
                                 : NetworkImage(
-                                "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" +
-                                    userData['userProfile']),
+                              "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" +
+                                  userData['userProfile'],
+                            ),
                             child: userData['userProfile'] == null ||
                                 userData['userProfile'] == '' ||
                                 userData['userProfile'] == 'NA'
-                                ? Icon(Icons
-                                .person) // Show person icon if condition is true
-                                : null, // No icon if there's an image
+                                ? const Icon(Icons.person)
+                                : null,
                           ),
                         ),
                       ),
-                      SizedBox(
-                        height: 10.0,
-                      ),
+                      const SizedBox(height: 10.0),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '${userData['firstName']} ${userData['lastName']}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 18.0,
                           ),
                         ),
                       ),
-
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Visibility(
@@ -1887,16 +1700,20 @@ class _AllDocListState extends State<AllDocList> {
                               userData['designationName']?.isNotEmpty == true,
                           child: Text(
                             userData['designationName'] ?? '',
-                            style:
-                            TextStyle(fontSize: 18.0, color: Colors.grey),
+                            style: const TextStyle(fontSize: 18.0, color: Colors.grey),
                           ),
                         ),
                       ),
-                      SizedBox(
-                        height: 10.0,
-                      ),
+                      const SizedBox(height: 10.0),
                     ],
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: Text(
+                  'Cabinets',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
               const Divider(
@@ -1906,48 +1723,80 @@ class _AllDocListState extends State<AllDocList> {
                 endIndent: 10,
                 color: Colors.black,
               ),
-              Expanded(
-                child:  ListView.builder(
-                itemCount: cabinets.length,
-                itemBuilder: (context, index) {
-                  final cabinet = cabinets[index];
-                  return ListTile(
-                    title: Text(cabinet.cabinetName ?? 'No Name'),
-                    leading: SvgPicture.asset(
-                      'assets/svg_icons/cabinate_icon.svg',
-                      width: 20,
-                      height: 20,
-                      // You can also specify color here if needed
-                      color: Colors.grey,
-                    ),
-                    trailing: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              // Cabinet ListView
+              Flexible(
+               // fit: FlexFit.tight,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: cabinets.length,
+                  itemBuilder: (context, index) {
+                    final cabinet = cabinets[index];
+                    final isSelected = cabinet.cabinetId == cabinetId;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 0.0),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(12),
+                        color: isSelected ? Colors.deepOrange.shade50 : Colors.transparent,
+                        borderRadius: BorderRadius.circular(40.0),
                       ),
-                      child: Text(
-                        cabinet.archiveCount.toString(),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      child: ListTile(
+                        title: Text(
+                          cabinet.cabinetName ?? 'No Name',
+                          style: const TextStyle(fontSize: 14.0),
                         ),
+                        leading: SvgPicture.asset(
+                          'assets/svg_icons/cabinate_icon.svg',
+                          width: 20,
+                          height: 20,
+                          color: Colors.grey,
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            cabinet.archiveCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            cabinetId = cabinet.cabinetId!;
+                            totalDocCount = cabinet.archiveCount ?? 0;
+                            _selectedIndex = 0; // Switch to the Archive tab
+                            _isLoading = true; // Set loading state
+                            appbarTitle = cabinet.cabinetName.toString();
+                          });
+                          fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+                          Navigator.pop(context); // Close the drawer after selection
+                        },
                       ),
-                    ),
-
-                    onTap: () {
-                      setState(() {
-                        cabinetId = cabinet.cabinetId!;
-                        totalDocCount = cabinet.archiveCount ?? 0;
-                        _selectedIndex = 0; // Switch to the Archive tab
-                        _isLoading = true; // Set loading state
-                      });
-                      fetchDocuments(isRefresh: true, cabinetId: cabinetId);
-                      Navigator.pop(context); // Close the drawer after selection
-                    },
-                  );
-                },
+                    );
+                  },
+                ),
               ),
+
+              Padding(
+                padding: const EdgeInsets.only(left: 15.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        SvgPicture.asset('assets/svg_icons/label_icon.svg' , color: Colors.grey,),
+                        SizedBox(width: 5.0),
+                        Text(
+                          'Labels / Tags',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const Divider(
                 thickness: 0.2,
@@ -1955,40 +1804,252 @@ class _AllDocListState extends State<AllDocList> {
                 indent: 10,
                 endIndent: 10,
               ),
-             Expanded(
-             child: labels.isEmpty
-                 ? SizedBox.shrink()
-            : ListView.builder(
-        padding: EdgeInsets.zero,
-        itemCount: labels.length,
-        itemBuilder: (context, index) {
-          final label = labels[index];
-          return ListTile(
-            minLeadingWidth: 0,
-            horizontalTitleGap: 0,
-            visualDensity:
-            VisualDensity(horizontal: 0, vertical: -4),
-            dense: true,
-            contentPadding: EdgeInsets.symmetric(
-                vertical: 0.0, horizontal: 20.0),
-            title: Text(label.labelName,
-                style: TextStyle(fontSize: 13.0)),
-            onTap: () async {
-              print('click');
-              print(label.labelId);
-             await fetchLabelArchives(label.labelId);
-              Navigator.pop(
-                  context); // Close the drawer after selection
-            },
-          );
-        },
-      ),
-             )
-
+              // Labels ListView
+              labels.isEmpty
+                  ? const SizedBox.shrink()
+                  : Flexible(
+                fit: FlexFit.tight,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: labels.length,
+                  itemBuilder: (context, index) {
+                    final label = labels[index];
+                    return ListTile(
+                      minLeadingWidth: 0,
+                      horizontalTitleGap: 0,
+                      visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 0.0,
+                        horizontal: 20.0,
+                      ),
+                      title: Text(
+                        label.labelName,
+                        style: const TextStyle(fontSize: 13.0),
+                      ),
+                      onTap: () async {
+                        await fetchLabelArchives(label.labelId);
+                        Navigator.pop(context); // Close the drawer after selection
+                        setState(() {
+                          appbarTitle = label.labelName;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
             ],
-          )
+          ),
         ),
       ),
+      // ClipRRect(
+      //   borderRadius: const BorderRadius.only(
+      //     topRight: Radius.circular(30.0),
+      //     bottomRight: Radius.circular(30.0),
+      //   ),
+      //   child: Drawer(
+      //     child:Column(
+      //       children: [
+      //         Padding(
+      //           padding: const EdgeInsets.only(top: 50.0, left: 15.0),
+      //           child: GestureDetector(
+      //             onTap: () {
+      //               Navigator.push(
+      //                 context,
+      //                 MaterialPageRoute(
+      //                     builder: (context) => PersonalInformation(
+      //                         loginUserId: userData['userId'])),
+      //               );
+      //             },
+      //             child: Column(
+      //               children: [
+      //                 // Padding(
+      //                 //   padding: const EdgeInsets.only(left: 8.0),
+      //                 //   child: Image.asset(
+      //                 //     'assets/dms-logo.png',
+      //                 //     width: 40,
+      //                 //     height: 40,
+      //                 //   ),
+      //                 // ),
+      //                 // const Padding(
+      //                 //   padding: EdgeInsets.only(),
+      //                 //   child: Text(
+      //                 //     'STREAM MAIL',
+      //                 //     style: TextStyle(
+      //                 //         color: Colors.black,
+      //                 //         fontSize: 20,
+      //                 //         fontWeight: FontWeight.w400,
+      //                 //         fontFamily: 'AvenirNextCyr-Bold'),
+      //                 //   ),
+      //                 // ),
+      //
+      //                 Align(
+      //                   alignment: Alignment.centerLeft,
+      //                   child: Container(
+      //                     decoration: BoxDecoration(
+      //                       shape: BoxShape.circle,
+      //                       // border: Border.all(
+      //                       //   color: Colors.grey, // Border color
+      //                       //   width: 0.5, // Border width
+      //                       // ),
+      //                     ),
+      //                     child: CircleAvatar(
+      //                       radius: 28.0,
+      //                       backgroundImage: userData['userProfile'] == null ||
+      //                           userData['userProfile'] == '' ||
+      //                           userData['userProfile'] == 'NA'
+      //                           ? null // No image if the condition is true
+      //                           : NetworkImage(
+      //                           "https://yrglobaldocuments.blob.core.windows.net/userprofileimages/" +
+      //                               userData['userProfile']),
+      //                       child: userData['userProfile'] == null ||
+      //                           userData['userProfile'] == '' ||
+      //                           userData['userProfile'] == 'NA'
+      //                           ? Icon(Icons
+      //                           .person) // Show person icon if condition is true
+      //                           : null, // No icon if there's an image
+      //                     ),
+      //                   ),
+      //                 ),
+      //                 SizedBox(
+      //                   height: 10.0,
+      //                 ),
+      //                 Align(
+      //                   alignment: Alignment.centerLeft,
+      //                   child: Text(
+      //                     '${userData['firstName']} ${userData['lastName']}',
+      //                     style: TextStyle(
+      //                       fontWeight: FontWeight.w800,
+      //                       fontSize: 18.0,
+      //                     ),
+      //                   ),
+      //                 ),
+      //
+      //                 Align(
+      //                   alignment: Alignment.centerLeft,
+      //                   child: Visibility(
+      //                     visible: userData['designationName'] != null &&
+      //                         userData['designationName'] != "N/A" &&
+      //                         userData['designationName'] != "NA" &&
+      //                         userData['designationName']?.isNotEmpty == true,
+      //                     child: Text(
+      //                       userData['designationName'] ?? '',
+      //                       style:
+      //                       TextStyle(fontSize: 18.0, color: Colors.grey),
+      //                     ),
+      //                   ),
+      //                 ),
+      //                 SizedBox(
+      //                   height: 10.0,
+      //                 ),
+      //               ],
+      //             ),
+      //           ),
+      //         ),
+      //         const Divider(
+      //           height: 10,
+      //           thickness: 0.2,
+      //           indent: 10,
+      //           endIndent: 10,
+      //           color: Colors.black,
+      //         ),
+      //         Expanded (child:  ListView.builder(
+      //           shrinkWrap: true,
+      //          itemCount: cabinets.length,
+      //          itemBuilder: (context, index) {
+      //            final cabinet = cabinets[index];
+      //            final isSelected = cabinet.cabinetId == cabinetId;
+      //            return Container(
+      //              margin: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 6.0),
+      //              decoration: BoxDecoration(
+      //                color: isSelected ? Colors.deepOrange.shade50 : Colors.transparent,
+      //                borderRadius: BorderRadius.circular(40.0),
+      //              ),
+      //              child: ListTile(
+      //                title: Text(cabinet.cabinetName ?? 'No Name',
+      //                  style: TextStyle(
+      //                    fontSize: 14.0,
+      //                    // fontWeight: FontWeight.w600,
+      //                    // color: isSelected ? Colors.deepOrange : Colors.black,
+      //                  ),
+      //                ),
+      //                leading: SvgPicture.asset(
+      //                  'assets/svg_icons/cabinate_icon.svg',
+      //                  width: 20,
+      //                  height: 20,
+      //                  // You can also specify color here if needed
+      //                  color: Colors.grey,
+      //                ),
+      //                trailing: Container(
+      //                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      //                  decoration: BoxDecoration(
+      //                    color: Colors.orange,
+      //                    borderRadius: BorderRadius.circular(12),
+      //                  ),
+      //                  child: Text(
+      //                    cabinet.archiveCount.toString(),
+      //                    style: TextStyle(
+      //                      color: Colors.white,
+      //                      fontWeight: FontWeight.bold,
+      //                    ),
+      //                  ),
+      //                ),
+      //
+      //                onTap: () {
+      //                  setState(() {
+      //                    cabinetId = cabinet.cabinetId!;
+      //                    totalDocCount = cabinet.archiveCount ?? 0;
+      //                    _selectedIndex = 0; // Switch to the Archive tab
+      //                    _isLoading = true; // Set loading state
+      //                  });
+      //                  fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+      //                  Navigator.pop(context); // Close the drawer after selection
+      //                },
+      //              ),
+      //            );
+      //          },
+      //        ),),
+      //         const Divider(
+      //           thickness: 0.2,
+      //           color: Colors.black,
+      //           indent: 10,
+      //           endIndent: 10,
+      //         ),
+      //        Expanded(
+      //        child: labels.isEmpty
+      //            ? SizedBox.shrink()
+      //       : ListView.builder(
+      //   padding: EdgeInsets.zero,
+      //   itemCount: labels.length,
+      //   itemBuilder: (context, index) {
+      //     final label = labels[index];
+      //     return ListTile(
+      //       minLeadingWidth: 0,
+      //       horizontalTitleGap: 0,
+      //       visualDensity:
+      //       VisualDensity(horizontal: 0, vertical: -4),
+      //       dense: true,
+      //       contentPadding: EdgeInsets.symmetric(
+      //           vertical: 0.0, horizontal: 20.0),
+      //       title: Text(label.labelName,
+      //           style: TextStyle(fontSize: 13.0)),
+      //       onTap: () async {
+      //         print('click');
+      //         print(label.labelId);
+      //        await fetchLabelArchives(label.labelId);
+      //         Navigator.pop(
+      //             context); // Close the drawer after selection
+      //       },
+      //     );
+      //   },
+      // ),
+      //        )
+      //
+      //       ],
+      //     )
+      //   ),
+      // ),
 
       body: _getWidgetOptions()
           .elementAt(_selectedIndex), // Display the selected widget
@@ -2009,7 +2070,10 @@ class _AllDocListState extends State<AllDocList> {
           // ),
           BottomNavigationBarItem(
             icon: InkWell(
-              onTap: () => _onItemTapped(0),
+              onTap: () => {
+                _onItemTapped(0)
+
+              },
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -2044,8 +2108,8 @@ class _AllDocListState extends State<AllDocList> {
                 ],
               ),
             ),
-            label: 'Archive',
-            tooltip: 'Archive',
+            label: 'All Docs',
+            tooltip: 'All Documents',
           ),
 
           BottomNavigationBarItem(
@@ -2144,14 +2208,14 @@ class _AllDocListState extends State<AllDocList> {
     };
   }
   //Api call function here
-  Future<void> fetchDocuments(   {required int cabinetId ,bool isRefresh = false}) async {
-    if (isLoading) return; // Prevent multiple fetch calls at the same time
+  Future<void> fetchDocuments(   {required int cabinetId ,bool isRefresh = false , String query = ''}) async {
+    // if (isLoading) return; // Prevent multiple fetch calls at the same time
 
     print('Fetching documents...');
 
-    setState(() {
-      isLoading = true;
-    });
+    // setState(() {
+    //   isLoading = true;
+    // });
 
     // If it's a refresh, reset the page number to 1
     if (isRefresh) {
@@ -2219,6 +2283,15 @@ class _AllDocListState extends State<AllDocList> {
                   .toList());
             }
           });
+
+          if (query.isNotEmpty) {
+            final searchLower = query.toLowerCase();
+            documents = documents.where((doc) {
+              final title = doc.documentName?.toLowerCase() ?? '';
+              final desc = doc.description?.toLowerCase() ?? '';
+              return title.contains(searchLower) || desc.contains(searchLower);
+            }).toList();
+          }
 
           print("Documents loaded: ${documents.length}");
           print("Total count :  ${totalCount.toString()}");
@@ -2819,7 +2892,11 @@ print(responseData);
   // }
   Future<void> _pickFromDevice() async {
     FilePickerResult? result =
-    await FilePicker.platform.pickFiles(allowMultiple: true);
+    await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: ['pdf'], // Only allow PDF files
+    );
 
     if (result != null) {
       List<XFile> selectedXFiles =
@@ -2839,22 +2916,57 @@ print(responseData);
     }
   }
 
+  // Future<void> _pickFromCamera() async {
+  //   final ImagePicker picker = ImagePicker();
+  //   final XFile? file = await picker.pickImage(source: ImageSource.camera);
+  //
+  //   if (file != null) {
+  //     setState(() {
+  //       print(file.name);
+  //       _selectedFiles.add(file); // Storing XFile directly
+  //       print(_selectedFiles);
+  //       _fileUploadStatuses.add('cancel');
+  //     });
+  //
+  //     await _uploadFile(File(file.path)); // Convert to File when needed
+  //   }
+  // }
+
   Future<void> _pickFromCamera() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? file = await picker.pickImage(source: ImageSource.camera);
+    final XFile? imageFile = await picker.pickImage(source: ImageSource.camera);
 
-    if (file != null) {
+    if (imageFile != null) {
+      // Create PDF document
+      final pdf = pw.Document();
+      final image = pw.MemoryImage(await File(imageFile.path).readAsBytes());
+
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Center(child: pw.Image(image));
+          },
+        ),
+      );
+
+      // Save PDF to temporary directory
+      final Directory tempDir = await getTemporaryDirectory();
+      final String pdfPath = p.join(tempDir.path, '${DateTime.now().millisecondsSinceEpoch}.pdf');
+      final File pdfFile = File(pdfPath);
+      await pdfFile.writeAsBytes(await pdf.save());
+
+      // Wrap PDF file as XFile
+      final XFile xPdfFile = XFile(pdfFile.path);
+
       setState(() {
-        print(file.name);
-        _selectedFiles.add(file); // Storing XFile directly
-        print(_selectedFiles);
+        _selectedFiles.add(xPdfFile); // Store the converted PDF as XFile
         _fileUploadStatuses.add('cancel');
       });
 
-      await _uploadFile(File(file.path)); // Convert to File when needed
+      // Upload the PDF file
+      await _uploadFile(pdfFile);
     }
   }
-
   // Future<void> _checkPermissionsAndOpenCamera() async {
   //   var status = await Permission.camera.status;
   //   if (!status.isGranted) {
@@ -3686,10 +3798,10 @@ print(responseData);
     try {
       // Read the Excel file
       final Uint8List bytes = await file.readAsBytes();
-      final excel = Excel.decodeBytes(bytes);
+      final excel = ex.Excel.decodeBytes(bytes);
 
       // Get the first sheet
-      final Sheet? sheet = excel.tables[excel.tables.keys.first];
+      final ex.Sheet? sheet = excel.tables[excel.tables.keys.first];
       if (sheet == null) throw Exception("No sheets found in Excel");
 
       // Define Canvas Size
@@ -3735,7 +3847,7 @@ print(responseData);
         for (int colIndex = 0;
         colIndex < maxCols && colIndex < sheet.maxColumns;
         colIndex++) {
-          var cell = sheet.cell(CellIndex.indexByColumnRow(
+          var cell = sheet.cell(ex.CellIndex.indexByColumnRow(
               columnIndex: colIndex, rowIndex: rowIndex));
           String text = cell.value?.toString() ?? "";
 
@@ -3965,7 +4077,7 @@ print(responseData);
     final response = await http.post(
       url,
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"CreatedBy": 31}),
+      body: jsonEncode({"CreatedBy": userData['userId']}),
     );
 
     if (response.statusCode == 200) {
@@ -4019,6 +4131,777 @@ print(responseData);
         isLoading = false;
       });
     }
+  }
+
+  //Search functionality for main inbox document
+Future<void> _handleSearch(BuildContext context) async {
+  try {
+    // Define the API endpoint
+    var apiUrl = Uri.parse(
+        '${ApiUrls.baseUrl}Gac/GacGetcompanydepartmentdropdowns');
+    // Define the request body
+    var body = jsonEncode(
+
+      {
+        "CreatedBy":userData['userId'],
+        "OrganizationId" : userData['organizationid'],
+      }
+    );
+
+    // Make a POST request to the API
+    var response = await http.post(
+      apiUrl,
+      body: body,
+      headers: {
+        'Content-Type': 'application/json', // Specify the content type
+      },
+    );
+
+    if (response.statusCode == 200) {
+      var data = jsonDecode(response.body);
+      print("This is response " + data.toString());
+    //For company
+      List<dynamic> companyJson = data['Data']['CompanyJson'];
+      List<String> companies = companyJson
+          .map((company) => company['CompanyName'].toString())
+          .toList();
+      List<String> companyIds =
+          companyJson.map((cId) => cId['CompanyId'].toString()).toList();
+      print("This is generated company data " + companies.toString());
+      print("These are company ids " + companyIds.toString());
+
+     //For department
+      List<dynamic> departmentJson = data['Data']['DepartmentJson'];
+      List<String> departmentNames = departmentJson
+          .map((user) => user['DepartmentName'].toString())
+          .toList();
+      List<String> departmentIds =
+      departmentJson.map((dId) => dId['DepartmentId'].toString()).toList();
+
+      print("This is department Names ; " + departmentNames.toString());
+      print("These are department ids ; " + departmentIds.toString());
+
+     //Document type
+      List<dynamic> documentTypeJson = data['Data']['DocumentTypeJson'];
+      List<String> documentTypes = documentTypeJson
+          .map((docType) => docType['DocumentTypeName'].toString())
+          .toList();
+      List<String> documentTypeIds = documentTypeJson
+          .map((docTypeId) => docTypeId['DocumentTypeId'].toString())
+          .toList();
+      print("This is document type Names ; " + documentTypes.toString());
+      print("These are document type ids ; " + documentTypeIds.toString());
+
+      //DistributionManufatureJason
+      List<dynamic> distributorManufactureJson = data['Data']['DistributorAndManufactureJson'];
+      List<String> distributorManufacturesNames = distributorManufactureJson
+          .map((dist) => dist['Name'].toString())
+          .toList();
+      List<String> distributorManufactureIds = distributorManufactureJson
+          .map((distId) => distId['DMId'].toString())
+          .toList();
+      print("This is distribution manufacture Names ; " + distributorManufacturesNames.toString());
+      print("These are distribution manufacture ids ; " + distributorManufactureIds.toString());
+
+      //for CategoryJson
+      List<dynamic> categoryJson = data['Data']['CategoryJson'];
+      List<String> categoriesName = categoryJson
+          .map((cat) => cat['CategoryName'].toString())
+          .toList();
+      List<String> categoriesId = categoryJson
+          .map((catId) => catId['CategoryId'].toString())
+          .toList();
+
+      print("This is category Names ; " + categoriesName.toString());
+      print("These are category ids ; " + categoriesId.toString());
+
+      //For SourceJson
+      List<dynamic> sourceJson = data['Data']['SourceJson'];
+      List<String> sourcesName = sourceJson
+          .map((src) => src['SourceName'].toString())
+          .toList();
+      List<String> sourcesId = sourceJson
+          .map((srcId) => srcId['SourceId'].toString())
+          .toList();
+      print("This is source Names ; " + sourcesName.toString());
+      print("These are source ids ; " + sourcesId.toString());
+
+      // Navigate to the second screen and pass the data
+      // Navigator.push(
+      //   context,
+      //   MaterialPageRoute(
+      //     builder: (context) => SearchField(
+      //       companies: companies,
+      //       fromUsers: fromUsers,
+      //       companyIds: companyIds,
+      //       userIds: userIds,
+      //     ),
+      //   ),
+      // );
+
+      _showBottomSheet(context,
+          companies,
+          companyIds,
+          departmentNames,
+          departmentIds,
+          documentTypes,
+          documentTypeIds,
+          distributorManufacturesNames,
+          distributorManufactureIds,
+          categoriesName,
+          categoriesId,
+          sourcesName,
+          sourcesId);
+    } else {
+      // Handle error
+      print('Error: ${response.statusCode}');
+    }
+  } catch (e) {
+    // Handle exceptions
+    print('Error: $e');
+  }
+}
+
+  List<String?> selectedCompanies = [];
+  List<String> selectedCompanyIds = [];
+ List<String> selectedDepartmentNames = [];
+  List<String> selectedDepartmentIds = [];
+  List<String?> selectedDocumentTypes = [];
+  List<String?> selectedDocumentTypeIds = [];
+  List<String?> selectedDistributorManufacturesNames = [];
+  List<String?> selectedDistributorManufactureIds = [];
+  List<String?> selectedCategoriesName = [];
+  List<String?> selectedCategoriesIds = [];
+  List<String?> selectedSourcesName = [];
+  List<String?> selectedSourcesIds = [];
+
+
+  void _showBottomSheet(
+      BuildContext context,
+      companies,
+      companyIds,
+      departmentNames,
+      departmentIds,
+      documentTypes,
+      documentTypeIds,
+      distributorManufacturesNames,
+      distributorManufactureIds,
+      categoriesName,
+      categoriesId,
+      sourcesName,
+      sourcesId, ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Allow the bottom sheet to adjust its height
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Container(
+              padding: EdgeInsets.all(16.0),
+              width: MediaQuery.of(context).size.width,
+              height: MediaQuery.of(context).size.height * 0.85,
+              child: SingleChildScrollView(
+                // Wrap the content in SingleChildScrollView
+                child: Column(
+                  mainAxisSize: MainAxisSize
+                      .min, // Ensure the column takes only as much space as needed
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10.0, right: 10.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Filters",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  print("tapped clear");
+                                  setState(() {
+                                    // clearFilters(setState);
+                                  });
+                                },
+                                child: Container(
+                                    padding: EdgeInsets.all(
+                                        5), // Optional padding around the content
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                          color: Colors.grey,
+                                          width: 1.0), // Border color and width
+                                      borderRadius: BorderRadius.circular(
+                                          80), // Rounded corners with radius
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          "Clear all",
+                                          style: TextStyle(fontSize: 10.0),
+                                        ),
+                                        SizedBox(
+                                          width: 2.0,
+                                        ),
+                                        // Icon(
+                                        //   Symbols.delete,
+                                        //   size: 12.0,
+                                        // ),
+                                        SvgPicture.asset(
+                                          'assets/svg_icons/delete_icon.svg',
+                                          width: 15,
+                                          height: 15,
+                                        )
+                                      ],
+                                    )),
+                              ),
+                              SizedBox(
+                                width: 5.0,
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    // clearFilters(setState);
+                                  });
+                                  Navigator.of(context).pop();
+                                },
+                                child: Icon(
+                                  MyIcons.close,
+                                  size: 16.0,
+                                ),
+                              )
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10.0),
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+                    MultiSelectDropdownButtonFormField(
+                      items: categoriesName,
+                      title: 'Category',
+                      selectedItems: selectedCategoriesName,
+                      onConfirm: (results) {
+                        setState(() {
+                          selectedCategoriesName = results;
+                          selectedCategoriesIds.clear();
+                          selectedCategoriesIds.addAll(results.map((catregory) {
+                            int index = categoriesName.indexOf(catregory!);
+                            return categoriesId[index];
+                          }));
+                        });
+                      },
+                      chipBackGroundColor: Colors.white,
+                    ),
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+                    MultiSelectDropdownButtonFormField(
+                      items: sourcesName,
+                      title: 'Source',
+                      selectedItems: selectedSourcesName,
+                      onConfirm: (results) {
+                        setState(() {
+                          selectedSourcesName = results;
+                          selectedSourcesIds.clear();
+                          selectedSourcesIds.addAll(results.map((source) {
+                            int index = sourcesName.indexOf(source!);
+                            return sourcesId[index];
+                          }));
+                        });
+                      },
+                      chipBackGroundColor: Colors.white,
+                    ),
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+
+                    MultiSelectDropdownButtonFormField(
+                      items: documentTypes,
+                      title: 'Document Type',
+                      selectedItems: selectedDocumentTypes,
+                      onConfirm: (results) {
+                        setState(() {
+                          selectedDocumentTypes = results;
+                          selectedDocumentTypeIds.clear();
+                          selectedDocumentTypeIds.addAll(results.map((docType) {
+                            int index = documentTypes.indexOf(docType!);
+                            return documentTypeIds[index];
+                          }));
+                        });
+                      },
+                      chipBackGroundColor: Colors.white,
+                    ),
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+                    MultiSelectDropdownButtonFormField(
+                      items: distributorManufacturesNames,
+                      title: 'Distributor & Manufacture',
+                      selectedItems: selectedDistributorManufacturesNames,
+                      onConfirm: (results) {
+                        setState(() {
+                          selectedDistributorManufacturesNames = results;
+                          selectedDistributorManufactureIds.clear();
+                          selectedDistributorManufactureIds.addAll(results.map((docType) {
+                            int index = distributorManufacturesNames.indexOf(docType!);
+                            return distributorManufactureIds[index];
+                          }));
+                        });
+                      },
+                      chipBackGroundColor: Colors.white,
+                    ),
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+                    // Padding(
+                    //   padding: const EdgeInsets.only(left: 10.0, right: 10.0),
+                    //   child: TextField(
+                    //     controller: subjectDateController,
+                    //     decoration: InputDecoration(
+                    //       hintText: 'Subject',
+                    //       hintStyle: TextStyle(
+                    //         fontSize:
+                    //         12, // Reduce the font size of the hint text
+                    //         color: Colors
+                    //             .grey, // You can also change the color if you want
+                    //       ),
+                    //       focusedBorder: UnderlineInputBorder(
+                    //         borderSide: BorderSide(
+                    //             color: Colors
+                    //                 .deepOrange), // Active color for the bottom border
+                    //       ),
+                    //       enabledBorder: UnderlineInputBorder(
+                    //         borderSide: BorderSide(
+                    //             color: Colors.grey
+                    //                 .shade300), // Inactive color for the bottom border
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+                    SizedBox(
+                      height: 10.0,
+                    ),
+
+                    // Padding(
+                    //   padding: const EdgeInsets.only(left: 10.0, right: 10.0),
+                    //   child: Column(
+                    //     mainAxisSize: MainAxisSize.min,
+                    //     crossAxisAlignment: CrossAxisAlignment.start,
+                    //     children: [
+                    //       Row(
+                    //         crossAxisAlignment: CrossAxisAlignment
+                    //             .start, // Aligns text at the top
+                    //         children: [
+                    //           Text(
+                    //             "Status: ",
+                    //             style: TextStyle(
+                    //               fontSize: 12,
+                    //               fontWeight: FontWeight.bold,
+                    //               color: Colors.black,
+                    //             ),
+                    //           ),
+                    //           Expanded(
+                    //             // Ensures wrapping if the text overflows
+                    //             child: Text(
+                    //               selectedStatuses
+                    //                   .join(', '), // Display selected statuses
+                    //               style: TextStyle(
+                    //                   fontSize: 11.0, color: Colors.grey),
+                    //               softWrap: true, // Enables text wrapping
+                    //               overflow: TextOverflow
+                    //                   .visible, // Ensures no truncation
+                    //             ),
+                    //           ),
+                    //         ],
+                    //       ),
+                    //       SizedBox(height: 10.0),
+                    //       // Row(
+                    //       //   children: [
+                    //       //     Transform.scale(
+                    //       //       scale: 0.8,
+                    //       //       child: Checkbox(
+                    //       //         shape: RoundedRectangleBorder(
+                    //       //           borderRadius: BorderRadius.circular(5),
+                    //       //           side: BorderSide(
+                    //       //             color: Colors.grey,
+                    //       //           ),
+                    //       //         ),
+                    //       //         value: isApprovalPending,
+                    //       //         onChanged: (value) {
+                    //       //           setState(() {
+                    //       //             isApprovalPending = value!;
+                    //       //             updateSelectedStatuses('Pending', value);
+                    //       //           });
+                    //       //         },
+                    //       //         activeColor: Colors.deepOrange,
+                    //       //         visualDensity: VisualDensity(
+                    //       //             horizontal: -4.0, vertical: -4.0),
+                    //       //       ),
+                    //       //     ),
+                    //       //     Text(
+                    //       //       'Pending',
+                    //       //       style: TextStyle(
+                    //       //           fontSize: 14.0, color: Colors.grey),
+                    //       //     ),
+                    //       //   ],
+                    //       // ),
+                    //       Row(
+                    //         children: [
+                    //           GestureDetector(
+                    //             onTap: () {
+                    //               setState(() {
+                    //                 isApprovalPending = !isApprovalPending;
+                    //                 updateSelectedStatuses('Pending', isApprovalPending);
+                    //               });
+                    //             },
+                    //             child: Row(
+                    //               children: [
+                    //                 Transform.scale(
+                    //                   scale: 0.8,
+                    //                   child: Checkbox(
+                    //                     shape: RoundedRectangleBorder(
+                    //                       borderRadius: BorderRadius.circular(5),
+                    //                       side: BorderSide(
+                    //                         color: Colors.grey,
+                    //                       ),
+                    //                     ),
+                    //                     value: isApprovalPending,
+                    //                     onChanged: (value) {
+                    //                       setState(() {
+                    //                         isApprovalPending = value!;
+                    //                         updateSelectedStatuses('Pending', value);
+                    //                       });
+                    //                     },
+                    //                     activeColor: Colors.deepOrange,
+                    //                     visualDensity: VisualDensity(
+                    //                       horizontal: -4.0,
+                    //                       vertical: -4.0,
+                    //                     ),
+                    //                   ),
+                    //                 ),
+                    //                 Text(
+                    //                   'Pending',
+                    //                   style: TextStyle(
+                    //                     fontSize: 14.0,
+                    //                     color: Colors.grey,
+                    //                   ),
+                    //                 ),
+                    //               ],
+                    //             ),
+                    //           ),
+                    //         ],
+                    //       ),
+                    //
+                    //       GestureDetector(
+                    //         onTap: () {
+                    //           setState(() {
+                    //             isReplyRequired = !isReplyRequired;
+                    //             updateSelectedStatuses('Reply Required', isReplyRequired);
+                    //           });
+                    //         },
+                    //         child: Row(
+                    //           children: [
+                    //             Transform.scale(
+                    //               scale: 0.8,
+                    //               child: Checkbox(
+                    //                 shape: RoundedRectangleBorder(
+                    //                   borderRadius: BorderRadius.circular(5),
+                    //                 ),
+                    //                 value: isReplyRequired,
+                    //                 onChanged: (value) {
+                    //                   setState(() {
+                    //                     isReplyRequired = value!;
+                    //                     updateSelectedStatuses('Reply Required', value);
+                    //                   });
+                    //                 },
+                    //                 activeColor: Colors.deepOrange,
+                    //                 visualDensity: VisualDensity(
+                    //                     horizontal: -4.0, vertical: -4.0),
+                    //               ),
+                    //             ),
+                    //             Text(
+                    //               'Reply Required',
+                    //               style: TextStyle(
+                    //                   fontSize: 14.0, color: Colors.grey),
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //
+                    //       GestureDetector(
+                    //         onTap: () {
+                    //           setState(() {
+                    //             isExpired = !isExpired;
+                    //             updateSelectedStatuses('Expired', isExpired);
+                    //           });
+                    //         },
+                    //         child: Row(
+                    //           children: [
+                    //             Transform.scale(
+                    //               scale: 0.8,
+                    //               child: Checkbox(
+                    //                 shape: RoundedRectangleBorder(
+                    //                   borderRadius: BorderRadius.circular(5),
+                    //                 ),
+                    //                 value: isExpired,
+                    //                 onChanged: (value) {
+                    //                   setState(() {
+                    //                     isExpired = value!;
+                    //                     updateSelectedStatuses('Expired', value);
+                    //                   });
+                    //                 },
+                    //                 activeColor: Colors.deepOrange,
+                    //                 visualDensity: VisualDensity(
+                    //                     horizontal: -4.0, vertical: -4.0),
+                    //               ),
+                    //             ),
+                    //             Text(
+                    //               'Expired',
+                    //               style: TextStyle(
+                    //                 fontSize: 14.0,
+                    //                 color: Colors.grey,
+                    //               ),
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //
+                    //       GestureDetector(
+                    //         onTap: () {
+                    //           setState(() {
+                    //             hasAttachment = !hasAttachment;
+                    //             updateSelectedStatuses('Has Attachment', hasAttachment);
+                    //           });
+                    //         },
+                    //         child: Row(
+                    //           children: [
+                    //             Transform.scale(
+                    //               scale: 0.8,
+                    //               child: Checkbox(
+                    //                 shape: RoundedRectangleBorder(
+                    //                   borderRadius: BorderRadius.circular(5),
+                    //                 ),
+                    //                 value: hasAttachment,
+                    //                 onChanged: (value) {
+                    //                   setState(() {
+                    //                     hasAttachment = value!;
+                    //                     updateSelectedStatuses('Has Attachment', value);
+                    //                   });
+                    //                 },
+                    //                 visualDensity: VisualDensity(
+                    //                     horizontal: -4.0, vertical: -4.0),
+                    //                 activeColor: Colors.deepOrange,
+                    //               ),
+                    //             ),
+                    //             Text(
+                    //               'Has Attachment',
+                    //               style: TextStyle(
+                    //                 fontSize: 14.0,
+                    //                 color: Colors.grey,
+                    //               ),
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //
+                    //       GestureDetector(
+                    //         onTap: () {
+                    //           setState(() {
+                    //             isConfidential = !isConfidential;
+                    //             updateSelectedStatuses('Is Confidential', isConfidential);
+                    //           });
+                    //         },
+                    //         child: Row(
+                    //           mainAxisSize: MainAxisSize.min,
+                    //           children: [
+                    //             Transform.scale(
+                    //               scale: 0.8,
+                    //               child: Checkbox(
+                    //                 shape: RoundedRectangleBorder(
+                    //                   borderRadius: BorderRadius.circular(5),
+                    //                 ),
+                    //                 value: isConfidential,
+                    //                 onChanged: (value) {
+                    //                   setState(() {
+                    //                     isConfidential = value!;
+                    //                     updateSelectedStatuses('Is Confidential', value);
+                    //                   });
+                    //                 },
+                    //                 visualDensity: VisualDensity(
+                    //                     horizontal: -4.0, vertical: -4.0),
+                    //                 activeColor: Colors.deepOrange,
+                    //               ),
+                    //             ),
+                    //             Text(
+                    //               'Is Confidential',
+                    //               style: TextStyle(
+                    //                 fontSize: 14.0,
+                    //                 color: Colors.grey,
+                    //               ),
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //
+                    //     ],
+                    //   ),
+                    // ),
+
+                    const Divider(
+                      height: 10,
+                      thickness: 0.1,
+                      indent: 10,
+                      endIndent: 10,
+                      color: Colors.black,
+                    ),
+
+                    // GestureDetector(
+                    //   onTap: _selectDateRange,  // Tap anywhere to show the date range picker
+                    //   child: Container(
+                    //     // padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                    //     // color: Colors.deepOrange,
+                    //     child: Text(
+                    //       dateRangeText,
+                    //       // style: TextStyle(color: Colors.white, fontSize: 18),
+                    //     ),
+                    //   ),
+                    // ),
+
+                    // Padding(
+                    //   padding: const EdgeInsets.only(left: 10.0, right: 10.0),
+                    //   child: GestureDetector(
+                    //     onTap: () async {
+                    //       final DateTimeRange? dateRange =
+                    //       await showDateRangePicker(
+                    //         context: context,
+                    //         initialDateRange: DateTimeRange(
+                    //           start: startDate ??
+                    //               DateTime.now().subtract(Duration(days: 7)),
+                    //           end: endDate ?? DateTime.now(),
+                    //         ),
+                    //         firstDate: DateTime(2000),
+                    //         lastDate: DateTime(2100),
+                    //       );
+                    //
+                    //       if (dateRange != null) {
+                    //         // Update both parent and local states
+                    //         setState(() {
+                    //           startDate = dateRange.start;
+                    //           endDate = dateRange.end;
+                    //           dateRangeText =
+                    //           '${DateFormat('yyyy-MM-dd').format(startDate!)} - ${DateFormat('yyyy-MM-dd').format(endDate!)}';
+                    //         });
+                    //
+                    //         setState(() {
+                    //           dateRangeText =
+                    //           '${DateFormat('yyyy-MM-dd').format(dateRange.start)} - ${DateFormat('yyyy-MM-dd').format(dateRange.end)}';
+                    //           // Navigator.pop(context);
+                    //         });
+                    //       }
+                    //     },
+                    //     child: Container(
+                    //       padding: EdgeInsets.all(10),
+                    //       decoration: BoxDecoration(
+                    //         border: Border(
+                    //           bottom: BorderSide(
+                    //               color: Colors.grey.shade300, width: 1),
+                    //         ),
+                    //       ),
+                    //       child: Row(
+                    //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    //         children: [
+                    //           Text(
+                    //             dateRangeText,
+                    //             style:
+                    //             TextStyle(fontSize: 12, color: Colors.grey),
+                    //           ),
+                    //           Icon(
+                    //             Icons.calendar_today,
+                    //             color: (dateRangeText == 'Select Date Range')
+                    //                 ? Colors.grey
+                    //                 : Colors.deepOrange,
+                    //             size: 16.0,
+                    //           ),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
+
+                    SizedBox(
+                      height: 35.0,
+                    ),
+                    // SizedBox(
+                    //   width:MediaQuery.of(context).size.width * 0.5,
+                    //
+                    //   child: ElevatedButton(
+                    //     onPressed: () async {
+                    //       setState(() {
+                    //         showPinMemos = false;
+                    //         showFilteredList = true;
+                    //         filterOptions = createFilterOptions();
+                    //         isLoading = true;
+                    //       });
+                    //       fetchFilteredData(filterOptions);
+                    //       Navigator.pop(context);
+                    //     },
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor:  Colors.deepOrange, // Background color
+                    //       shape: RoundedRectangleBorder(
+                    //         side: BorderSide.none, // No border
+                    //         borderRadius: BorderRadius.circular(80.0), // Rounded corners
+                    //       ),
+                    //       elevation: 0, // Remove shadow
+                    //     ),
+                    //     child: Row(
+                    //       mainAxisAlignment: MainAxisAlignment.center,
+                    //       children: [
+                    //         Icon(
+                    //           MyIcons.check,
+                    //           size: 20.0,
+                    //           color: Colors.white,
+                    //         ),
+                    //         SizedBox(width: 5.0),
+                    //         Text(
+                    //           'Filter',
+                    //           style: TextStyle(color: Colors.white), // Text color
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    //
+                    // )
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
 }

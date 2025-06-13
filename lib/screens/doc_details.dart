@@ -247,9 +247,52 @@ String? positionY;
       bottomNavigationBar: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(onPressed: () {}, icon: Icon(Icons.star)),
-          IconButton(onPressed: () {}, icon: Icon(Icons.push_pin_sharp)),
-          IconButton(onPressed: () {}, icon: Icon(Icons.delete)),
+          ...documents.map((doc) {
+            return IconButton(
+              onPressed: () {
+                callArchiveFavoriteApi(doc.documentId, doc.shareId, doc.isFavorite);
+
+              setState(() {
+                doc.isFavorite = !doc.isFavorite; // Toggle favorite state
+              });
+
+              },
+              icon: Icon(
+                Icons.star,
+                color: doc.isFavorite  ? Colors.yellow.shade600 : Colors.grey,
+              ),
+              tooltip: 'Star Doc ${doc.documentId}',
+            );
+          }).toList(),
+          ...documents.map((doc)  {
+            return IconButton(
+              onPressed: () async {
+                print('Toggle pin for Document ID: ${doc.documentId}');
+
+                await callArchiveIspin(doc.documentId , doc.shareId , !doc.isPin);
+               setState(() {
+                doc.isPin = !doc.isPin; // Toggle pin state
+               });
+                // Toggle isPin logic here
+              },
+              icon: Icon(
+                Icons.push_pin_sharp,
+                color: doc.isPin ? Colors.blue : Colors.grey,
+              ),
+              tooltip: doc.isPin ? 'Unpin Doc ${doc.documentId}' : 'Pin Doc ${doc.documentId}',
+            );
+          }).toList(),
+          // 🗑️ DELETE BUTTON for each document
+          ...documents.map((doc) {
+            return IconButton(
+              onPressed: () {
+                print('Delete Document ID: ${doc.documentId}');
+                // Call delete API or update state here
+              },
+              icon: Icon(Icons.delete, color: Colors.black),
+              tooltip: 'Delete Doc ${doc.documentId}',
+            );
+          }).toList(),
           // IconButton(
           //   onPressed: () {
           //     // if (documentUrl != null) {
@@ -948,6 +991,8 @@ print(documentUrl);
     try {
       final expiryTime = DateTime.now().add(Duration(days: 1));
       final expiryTimeString = expiryTime.toUtc().toIso8601String();
+      print("expiry time "+ expiryTimeString);
+      print("file path "+ filePath);
       final url = Uri.parse(
         '${ApiUrls.baseUrl}FileUploadAPI/NewGenerateSASTokenUrl',
       ).replace(
@@ -964,11 +1009,12 @@ print(documentUrl);
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
+        print("response data "+ responseData.toString());
         setState(() {
           sasUrl = responseData['sasUrl'] as String;
           isLoading = false;
         });
-        print(sasUrl);
+        print("print sas url "+ sasUrl!);
       } else {
         throw Exception('Failed to get SAS URL: ${response.statusCode}');
       }
@@ -982,6 +1028,9 @@ print(documentUrl);
 
   Future<void> _checkDocumentType(String url) async {
     if (url.endsWith('.pdf')) {
+      setState(() {
+        isLoading = true;
+      });
       _fileType = 'pdf';
       await _handlePdf(sasUrl!);
     } else if (url.endsWith('.jpg') ||
@@ -1119,8 +1168,48 @@ print(documentUrl);
     }
   }
 
+  Future<void> callArchiveIspin(int documentId , int shareId , bool isPin) async {
+    final url = Uri.parse('${ApiUrls.baseUrl}Gac/ArchiveIspin_V2');
 
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "DocumentId": documentId,
+        "ShareId": shareId,
+        "IsPin": isPin,
+        "CreatedBy": widget.createdBy,
+      }),
+    );
 
+    if (response.statusCode == 200) {
+      print('Success: ${response.body}');
+    } else {
+      print('Error: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  Future<void> callArchiveFavoriteApi(int documentId , int shareId , bool isFavorite) async {
+    final url = Uri.parse('https://cswebapps.com/dmsapitest/api/Gac/ArchiveFavorite_V2');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "DocumentId": documentId,
+        "ShareId": shareId,
+        "IsFavorite": isFavorite,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      print('Success: ${response.body}');
+    } else {
+      print('Failed: ${response.statusCode} - ${response.body}');
+    }
+  }
 
   void _downloadDocument(String url) async {
     final Uri uri = Uri.parse(url);

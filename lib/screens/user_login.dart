@@ -175,7 +175,7 @@ class _UserLogInState extends State<UserLogIn> {
                           ),
                           children: [
                             TextSpan(
-                              text: "Stream Archive", // Blue text
+                              text: "S Docs", // Blue text
                               style: TextStyle(
                                 color: Colors.deepOrange,
                                 fontSize: 30.0,// Set color to blue
@@ -524,7 +524,7 @@ class _UserLogInState extends State<UserLogIn> {
           ),
         ],
       ),
-      backgroundColor: Colors.blue,
+      backgroundColor: Colors.deepOrange,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(snackBar);

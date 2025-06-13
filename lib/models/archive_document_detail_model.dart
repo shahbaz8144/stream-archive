@@ -7,7 +7,7 @@ class ArchiveDocumentDetailModel {
   final String createdDate;
   final String designationName;
   final String url;
-  final bool isFavorite;
+   bool isFavorite;
   final List<UserAction> userActions;
   final List<UserInfo> userList;
   final List<VersionInfo> versions;
@@ -26,7 +26,7 @@ class ArchiveDocumentDetailModel {
   final int parentId;
   final int labelCount;
   final bool isDeleted;
-  final bool isPin;
+   bool isPin;
   final String labelIds;
   final int shareId;
   final bool isPhysical;
