@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:open_file/open_file.dart';
@@ -81,8 +82,10 @@ String? positionY;
   Future<void> _initialize() async {
     await fetchArchiveDocumentsDetails();
     if (documentUrl != null) {
+      print("test 1 "+documentUrl!);
       await fetchAndSetSasUrl(documentUrl!);
       print('doc url');
+      print(sasUrl);
       print(documentUrl);
       await _checkDocumentType(documentUrl!);
       if (_fileType == 'web' && sasUrl != null) {
@@ -108,11 +111,164 @@ String? positionY;
               showModalBottomSheet(
                 context: context,
                 builder: (context) {
-                  return Container(
-                    height: 400,
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16),
-                    child: Text('doc details here'),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: documents.map((doc) {
+                      return Column(
+                        children: [
+                          SizedBox(
+                            height: 20,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 0.0 , left: 10.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(6), // Optional: for spacing around the icon
+                                  decoration: BoxDecoration(
+                                    color: Colors.deepOrange,
+                                    shape: BoxShape.circle, // or use BoxShape.rectangle for square/rounded
+                                  ),
+                                  child: Icon(
+                                    Symbols.docs,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 8.0),
+                                Text("Document Details", style: TextStyle(fontSize: 20,  color: Colors.grey)),
+                               SizedBox(width: 2.0),
+                                Container(
+                                  color: Colors.grey[200], // Light grey background
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Symbols.stacks, size: 18, color: Colors.grey),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        "V_" + doc.versionName,
+                                        style: TextStyle(color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                )
+
+
+                              ],
+                            ),
+                          ),
+                          Divider(
+                            color: Colors.grey,
+                            thickness: 0.5,
+                          ),
+                          SizedBox(height: 10),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Row(
+                              children: [
+                                Text(
+                                  "Cabinet Name : ",
+                                  style: TextStyle(fontSize: 16, color: Colors.black , fontWeight: FontWeight.bold),
+                                ),
+                                Text(doc.cabinetName,
+                                  style: TextStyle(fontSize: 16, color: Colors.black),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Row(
+                              children: [
+                                Text(
+                                  "Document Name : ",
+                                  style: TextStyle(fontSize: 16, color: Colors.black , fontWeight: FontWeight.bold),
+                                ),
+                                Text(doc.documentName,
+                                  style: TextStyle(fontSize: 16, color: Colors.black),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 20),
+                          Card(
+                            child: Container(
+                              color: Colors.grey[200], // Light grey background
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+
+                                children: [
+                                  Icon(Symbols.person, size: 25, color: Colors.grey),
+                                  SizedBox(width: 4),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Owner ",
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        doc.userName,
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(height: 10),
+                          Card(
+                            child:   Container(
+                              color: Colors.grey[200], // Light grey background
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Icon(Symbols.date_range, size: 25, color: Colors.grey),
+                                  SizedBox(width: 4),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+
+                                      Text(
+                                        "Date",
+                                        style: TextStyle(fontSize: 16, color: Colors.black , fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        doc.createdDate,
+                                        style: TextStyle(fontSize: 16, color: Colors.black),
+                                      ),
+                                    ],
+                                  )
+
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 10),
+                          Image.asset('assets/detail_barcode.png',
+                            width: 300,
+                            height: 100,
+                          ),
+                          Text(doc.prefix + " " + doc.barcode,
+                            style: TextStyle(fontSize: 16, color: Colors.black ),
+                          ),
+
+                        ],
+                      );
+                    }).toList(),
                   );
                 },
               );

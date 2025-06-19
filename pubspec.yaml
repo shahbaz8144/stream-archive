@@ -182,4 +182,5 @@ flutter:
    - assets/svg_icons/stream_box_icon.svg
    - assets/svg_icons/cabinate_icon.svg
    - assets/bar-code.PNG
+   - assets/detail_barcode.png
 

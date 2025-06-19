@@ -498,7 +498,7 @@ class _AllDocListState extends State<AllDocList> {
                             ],
                           ),
                           endActionPane: ActionPane(
-                            extentRatio: 0.25,
+                            extentRatio: 0.35,
                             motion: const BehindMotion(),
                             children: [
                               CustomSlidableAction(
@@ -509,21 +509,19 @@ class _AllDocListState extends State<AllDocList> {
                                     : Colors.white,
                                 onPressed: (BuildContext
                                 context) async {
-                                  print(doc.isFavorite);
-                                  print("working slide");
+
                                   // setState(() {
                                   //   print("test1");
                                   //   doc.isFavorite = !doc
                                   //       .isFavorite; // Update the favorite status of the mail
                                   //   print("test2");
                                   // });
-                                  print("docId" + doc.documentId.toString());
-                                  print("shareId" + doc.shareId.toString());
-                                  print("Favorite " + doc.isFavorite.toString());
-                                  print("CabinetId " + cabinetId.toString());
+
                                  await archiveFavorite(doc.documentId , doc.shareId , doc.isFavorite);
 
-                                 await fetchDocuments(cabinetId: cabinetId);
+                                  setState(() {
+                                    fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+                                  });
                                   print("After Favorite " + doc.isFavorite.toString());
                                 },
                                 child: Icon(
@@ -539,11 +537,54 @@ class _AllDocListState extends State<AllDocList> {
                                 ),
                               ),
                               CustomSlidableAction(
+                                backgroundColor:  Colors.black.withOpacity(0.10),
+                                // Set to null since we will customize the child
+                                foregroundColor: Colors.white,
+                                onPressed:
+                                    (BuildContext context) async {
+                                  // Toggle the mailView status
+
+
+                                  setState(() {
+                                    doc.isRead =
+                                    !doc.isRead;
+                                  });
+                                 await callArchiveReadUnRead(doc.shareId , doc.documentId , doc.isRead);
+
+                                  // Refresh the data after the status is updated
+                                  setState(() {
+                                    fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+                                  });
+
+                                },
+                                child: Column(
+                                  mainAxisAlignment:
+                                  MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      doc.isRead
+                                          ? Icons.mark_as_unread
+                                          :  Icons.mail_outline ,
+                                      color: doc.isRead
+                                          ? Colors.deepOrange
+                                          : Colors.black,
+                                      size: 20.0,
+                                    ),
+
+                                  ],
+                                ),
+                              ),
+                              CustomSlidableAction(
                                 backgroundColor:
                                 Colors.black.withOpacity(0.10),
                                 onPressed: (BuildContext
                                 context) async {
-                                  // Delete the memo
+                                  // Handle the delete action
+                                  print("Delete action pressed for document ID: ${doc.documentId}");
+                                  await archiveTrash(doc.shareId, doc.documentId);
+                                  setState(() {
+                                    fetchDocuments(isRefresh: true, cabinetId: cabinetId);
+                                  });
 
                                 },
                                 child: Icon(
@@ -638,7 +679,18 @@ class _AllDocListState extends State<AllDocList> {
                                         ),
                                       ),
 
-                                  ],
+                                    if (doc.isPin)
+                                      Icon(
+                                        Icons.push_pin_sharp,
+                                        size: 15,
+                                        color: Colors.deepOrange,
+                                      ),
+                                    if (doc.isFavorite)
+                                      Icon(
+                                        LineAwesomeIcons.star,
+                                        size: 15,
+                                        color: Colors.yellow.shade800,
+                                      ),],
                                 ),
 
 
@@ -849,7 +901,53 @@ class _AllDocListState extends State<AllDocList> {
           itemCount: favoriteDocuments.length,
           itemBuilder: (context, index) {
             final doc = favoriteDocuments[index];
-            return Column(
+            return Slidable(
+                key: ValueKey(index),
+                endActionPane: ActionPane(
+                  extentRatio: 0.15,
+                  motion: const BehindMotion(),
+                  children: [
+                    CustomSlidableAction(
+                      backgroundColor:
+                      Colors.black.withOpacity(0.10),
+                      foregroundColor: doc.isFavorite
+                          ? Colors.yellow
+                          : Colors.white,
+                      onPressed: (BuildContext
+                      context) async {
+                        print(doc.isFavorite);
+                        print("working slide");
+                        // setState(() {
+                        //   print("test1");
+                        //   doc.isFavorite = !doc
+                        //       .isFavorite; // Update the favorite status of the mail
+                        //   print("test2");
+                        // });
+                        print("docId" + doc.documentId.toString());
+                        print("shareId" + doc.sharedId.toString());
+                        print("Favorite " + doc.isFavorite.toString());
+                        print("CabinetId " + cabinetId.toString());
+                        await archiveFavorite(doc.documentId , doc.sharedId , doc.isFavorite);
+
+                        await fetchFavoriteDocuments(query: _searchQuery);
+                        print("After Favorite " + doc.isFavorite.toString());
+                      },
+                      child: Icon(
+                        doc.isFavorite
+                            ? Icons.star
+                            : Icons
+                            .star_border_outlined,
+                        color: doc.isFavorite
+                            ? Colors
+                            .yellow.shade600
+                            : Colors.black,
+                        size: 20.0,
+                      ),
+                    ),
+
+                  ],
+                ),
+                child: Column(
               children: [
                 ListTile(
 
@@ -948,7 +1046,8 @@ class _AllDocListState extends State<AllDocList> {
                   color: Colors.grey,
                 ),
               ],
-            );
+            ))
+            ;
           },
         ),
       ),
@@ -2114,7 +2213,9 @@ class _AllDocListState extends State<AllDocList> {
 
           BottomNavigationBarItem(
             icon: InkWell(
-              onTap: () => _onItemTapped(1),
+              onTap: () => {_onItemTapped(1),
+
+    },
               child: SvgPicture.asset(
                 'assets/svg_icons/archive_favorite_icon.svg',
                 color: _selectedIndex == 1 ? Colors.amber[800] : Colors.grey,
@@ -2266,7 +2367,7 @@ class _AllDocListState extends State<AllDocList> {
           print("totalCount " + totalCount.toString());
 
           setState(() {
-            if (isRefresh) {
+            // if (isRefresh) {
               // If it's a refresh, clear the existing list
               documents = jsonList
                   .map((json) => ArchiveDocument.fromJson(json))
@@ -2276,12 +2377,13 @@ class _AllDocListState extends State<AllDocList> {
                   .toList();
 
               totalDocCount = totalCount;
-            } else {
-              // If it's loading more, append to the existing list
-              documents.addAll(jsonList
-                  .map((json) => ArchiveDocument.fromJson(json))
-                  .toList());
-            }
+            // }
+            // else {
+            //   // If it's loading more, append to the existing list
+            //   documents.addAll(jsonList
+            //       .map((json) => ArchiveDocument.fromJson(json))
+            //       .toList());
+            // }
           });
 
           if (query.isNotEmpty) {
@@ -2728,6 +2830,42 @@ print(responseData);
       }
     } catch (e) {
       // Handle exception
+      print('Error: $e');
+    }
+  }
+
+
+
+  ///// Call read and unread function form here
+  Future<void> callArchiveReadUnRead(
+     int shareId,
+     int  documentId,
+     bool  isRead,
+  ) async {
+    final url = Uri.parse('${ApiUrls.baseUrl}Gac/ArchiveReadUnRead_V2');
+
+    final Map<String, dynamic> requestBody = {
+      "ShareId": shareId,
+      "DocumentId": documentId,
+      "IsRead": isRead,
+    };
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        print('Success: ${response.body}');
+      } else {
+        print('Failed with status: ${response.statusCode}');
+        print('Body: ${response.body}');
+      }
+    } catch (e) {
       print('Error: $e');
     }
   }

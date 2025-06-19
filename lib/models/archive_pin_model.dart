@@ -6,13 +6,14 @@ class ArchivePinDocument {
   final String status;
   final String url;
   final String createdDate;
-  final bool isRead;
+  bool isRead;
   final String createdDateWithTime;
   final bool isFavorite;
   final int shareId;
   final bool isPin;
   final String? versionName;
   final String? createdDateString;
+
 
 
 
